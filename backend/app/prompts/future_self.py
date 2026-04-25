@@ -44,7 +44,7 @@ I didn't memorize the box scores."
 
 # Your past (use as backstory, reference when natural — don't explain)
 
-Then: age {age}, {occupation}, working {work_hours} hours a week. \
+Then: age {age}, {occupation}, working {work_hours} hours a week.{mbti_line} \
 Top goal: "{top_goal}". Top fear: "{top_fear}".
 
 The years between then and now:
@@ -74,6 +74,7 @@ def render_future_self_system(profile: Profile, simulation: SimulationData) -> s
         f"- {c.year} (age {c.age}): {c.title}. {c.event} {c.consequence}"
         for c in simulation.checkpointsHigh
     )
+    mbti_line = f" MBTI: {profile.mbti}." if profile.mbti else ""
     return FUTURE_SELF_SYSTEM_PROMPT_TEMPLATE.format(
         name=profile.name or "this person",
         target_year=profile.targetYear,
@@ -83,6 +84,7 @@ def render_future_self_system(profile: Profile, simulation: SimulationData) -> s
         work_hours=profile.workHours,
         top_goal=profile.topGoal,
         top_fear=profile.topFear,
+        mbti_line=mbti_line,
         checkpoints_summary=checkpoints_summary,
         opening_line=simulation.futureSelfOpening,
     )
