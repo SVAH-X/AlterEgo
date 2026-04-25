@@ -18,7 +18,23 @@ import {
 } from "./screens/screens-b";
 import { ScreenSelfie } from "./screens/screen-selfie";
 
-export type SimStreamPhase = "idle" | "streaming" | "complete" | "error";
+export type SimStreamPhase =
+  | "idle"
+  | "counting"
+  | "plan"
+  | "events"
+  | "finalizing"
+  | "complete"
+  | "error";
+
+export interface FilledOutline {
+  year: number;
+  severity: number;
+  hint: string;
+  filled: boolean;
+  pulse: number;
+  title?: string;
+}
 
 export interface ScreenProps {
   onContinue: () => void;
@@ -34,6 +50,9 @@ export interface ScreenProps {
   selfie: Blob | null;
   setSelfie: (s: Blob | null) => void;
   simStreamPhase: SimStreamPhase;
+  agentCount: number;
+  outline: FilledOutline[];
+  latestTitle: string;
   portraitsDone: number;
   mergePortrait: (p: AgedPortrait) => void;
   runSimulate: () => void;
@@ -65,6 +84,9 @@ export default function App() {
   const [selfie, setSelfie] = useState<Blob | null>(null);
   const [timelineViewed, setTimelineViewed] = useState(false);
   const [simStreamPhase, setSimStreamPhase] = useState<SimStreamPhase>("idle");
+  const [agentCount, setAgentCount] = useState(0);
+  const [outline, setOutline] = useState<FilledOutline[]>([]);
+  const [latestTitle, setLatestTitle] = useState<string>("");
   const [portraitsDone, setPortraitsDone] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -88,6 +110,9 @@ export default function App() {
     setTimelineViewed(false);
     setSelfie(null);
     setSimStreamPhase("idle");
+    setAgentCount(0);
+    setOutline([]);
+    setLatestTitle("");
     setPortraitsDone(0);
     setErrorMessage(null);
     streamingRef.current = false;
@@ -117,15 +142,53 @@ export default function App() {
       return;
     }
     streamingRef.current = true;
-    setSimStreamPhase("streaming");
+    // Reset processing state so a re-run starts fresh.
+    setSimStreamPhase("counting");
+    setAgentCount(0);
+    setOutline([]);
+    setLatestTitle("");
     setPortraitsDone(0);
     setErrorMessage(null);
     (async () => {
       try {
         for await (const ev of simulateStream(profile, selfie)) {
-          if (ev.phase === "complete") {
-            // Use the raw setter so we don't double-reset timelineViewed; we
-            // explicitly reset it here in one shot.
+          if (ev.phase === "counting") {
+            setAgentCount(ev.agents.length);
+            setSimStreamPhase("plan"); // counting done — moving on to planning
+          } else if (ev.phase === "plan") {
+            setOutline(
+              ev.outline.map((o) => ({
+                year: o.year,
+                severity: o.severity,
+                hint: o.hint,
+                filled: false,
+                pulse: 0,
+              })),
+            );
+            setSimStreamPhase("events");
+          } else if (ev.phase === "event") {
+            const cp = ev.checkpoint;
+            setOutline((prev) => {
+              const next = prev.map((o) => ({ ...o }));
+              const idx =
+                ev.index >= 0 && ev.index < next.length
+                  ? ev.index
+                  : next.findIndex((o) => o.year === cp.year && !o.filled);
+              if (idx >= 0 && idx < next.length) {
+                next[idx] = {
+                  ...next[idx],
+                  filled: true,
+                  pulse: next[idx].pulse + 1,
+                  title: cp.title,
+                };
+              }
+              return next;
+            });
+            setLatestTitle(cp.title);
+          } else if (ev.phase === "finalizing") {
+            setSimStreamPhase("finalizing");
+            setLatestTitle("weaving the threads — the alternate path, the voice");
+          } else if (ev.phase === "complete") {
             setSimulationState(ev.simulation);
             setTimelineViewed(false);
             setSimStreamPhase("complete");
@@ -138,8 +201,6 @@ export default function App() {
             setErrorMessage(ev.message);
             setSimStreamPhase("error");
           }
-          // Other phases (counting, plan, event, finalizing) are observable
-          // by Processing if it wants — they're discarded here for now.
         }
       } catch (e) {
         setErrorMessage(e instanceof Error ? e.message : String(e));
@@ -182,6 +243,9 @@ export default function App() {
           selfie={selfie}
           setSelfie={setSelfie}
           simStreamPhase={simStreamPhase}
+          agentCount={agentCount}
+          outline={outline}
+          latestTitle={latestTitle}
           portraitsDone={portraitsDone}
           mergePortrait={mergePortrait}
           runSimulate={runSimulate}
