@@ -13,27 +13,8 @@ import {
 import type { PortraitMood } from "../atoms";
 import { AE_DATA } from "../data";
 import { chat, simulateBranchStream } from "../lib/api";
+import { nearestPortrait } from "../lib/portraits";
 import type { AgedPortrait, Checkpoint, Tone, Trajectory } from "../types";
-
-function nearestPortrait(
-  portraits: AgedPortrait[] | undefined,
-  trajectory: Trajectory,
-  year: number,
-  maxDistance = 3,
-): AgedPortrait | null {
-  if (!portraits) return null;
-  let best: AgedPortrait | null = null;
-  let bestDist = Infinity;
-  for (const p of portraits) {
-    if (p.trajectory !== trajectory || !p.imageUrl) continue;
-    const d = Math.abs(p.year - year);
-    if (d < bestDist) {
-      bestDist = d;
-      best = p;
-    }
-  }
-  return bestDist <= maxDistance ? best : null;
-}
 
 const TONE_COLOR: Record<Tone, string> = {
   warn: "var(--warn)",
@@ -151,7 +132,19 @@ export function ScreenChat({ onContinue, profile, simulation }: ScreenProps) {
         }}
       >
         <div style={{ width: "100%", height: 420, flexShrink: 0, maxWidth: 320 }}>
-          <Portrait age={olderAge} mood="dim" />
+          {(() => {
+            const p = nearestPortrait(simulation?.agedPortraits, "high", profile.targetYear);
+            if (p?.imageUrl) {
+              return (
+                <img
+                  src={p.imageUrl}
+                  alt={`you at ${p.age}`}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
+                />
+              );
+            }
+            return <Portrait age={olderAge} mood="dim" />;
+          })()}
         </div>
         <div style={{ textAlign: "center" }}>
           <div

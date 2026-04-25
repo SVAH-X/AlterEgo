@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ScreenProps, SimStreamPhase } from "../App";
 import { CornerLabel, Mark, Meta, Portrait, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
+import { nearestPortrait } from "../lib/portraits";
 import type { Profile } from "../types";
 
 export function ScreenLanding({ onContinue }: ScreenProps) {
@@ -682,7 +683,19 @@ export function ScreenReveal({ onContinue, profile, simulation }: ScreenProps) {
               transition: "opacity 2200ms var(--ease)",
             }}
           >
-            <Portrait age={olderAge} mood="dim" />
+            {(() => {
+              const p = nearestPortrait(simulation?.agedPortraits, "high", profile.targetYear);
+              if (p?.imageUrl) {
+                return (
+                  <img
+                    src={p.imageUrl}
+                    alt={`you at ${p.age}`}
+                    style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
+                  />
+                );
+              }
+              return <Portrait age={olderAge} mood="dim" />;
+            })()}
           </div>
 
           <div
