@@ -32,4 +32,4 @@ def test_simulation_data_accepts_aged_portraits() -> None:
         futureSelfReplies={"a": "b"},
     )
     assert len(sim.agedPortraits) == 1
-    assert "ages" not in sim.model_fields
+    assert "ages" not in SimulationData.model_fields

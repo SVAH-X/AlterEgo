@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -16,4 +16,4 @@ class AgedPortrait(BaseModel):
     age: int
     year: int
     trajectory: Trajectory
-    imageUrl: Optional[str] = None
+    imageUrl: str | None = None
