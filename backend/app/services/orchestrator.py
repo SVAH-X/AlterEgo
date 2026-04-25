@@ -107,8 +107,7 @@ async def stream_simulation(
         )
         yield {"phase": "complete", "simulation": sim.model_dump()}
         # AMENDMENT A4: short-circuit on missing API key (silent skip per spec)
-        settings_local = get_settings()
-        if selfie_bytes and settings_local.gemini_api_key:
+        if selfie_bytes and settings.gemini_api_key:
             async for ev in _fan_out_portraits(
                 profile=profile, selfie_bytes=selfie_bytes, selfie_mime=selfie_mime,
                 high=completed, low=alternate_cps, ages=ages,
