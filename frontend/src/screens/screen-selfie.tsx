@@ -8,7 +8,7 @@ type CaptureState =
 
 const MAX_EDGE = 1024;
 
-export function ScreenSelfie({ onContinue, onBack, selfie, setSelfie }: ScreenProps) {
+export function ScreenSelfie({ onContinue, onBack, selfie, setSelfie, setSelfieUploaded }: ScreenProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [state, setState] = useState<CaptureState>(() =>
@@ -101,6 +101,7 @@ export function ScreenSelfie({ onContinue, onBack, selfie, setSelfie }: ScreenPr
   function confirm() {
     if (state.kind !== "preview") return;
     setSelfie(state.blob);
+    setSelfieUploaded(true);
     onContinue();
   }
 
@@ -119,6 +120,19 @@ export function ScreenSelfie({ onContinue, onBack, selfie, setSelfie }: ScreenPr
       <h2 className="serif" style={{ fontSize: 32, textAlign: "center", maxWidth: 600, margin: 0 }}>
         First, look at yourself.
       </h2>
+      <p
+        className="muted"
+        style={{
+          fontFamily: "var(--mono)",
+          fontSize: 11,
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          margin: 0,
+          marginTop: -12,
+        }}
+      >
+        take a selfie · or upload one
+      </p>
 
       {/* Photo well */}
       <div

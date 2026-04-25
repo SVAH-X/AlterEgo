@@ -132,7 +132,6 @@ export function ScreenChat({ onContinue, profile, simulation, selfieUploaded }: 
         }}
       >
         <div style={{ width: "100%", height: 420, flexShrink: 0, maxWidth: 320 }}>
-          <Portrait age={olderAge} mood="dim" blurred={!selfieUploaded} />
           {(() => {
             const p = nearestPortrait(simulation?.agedPortraits, "high", profile.targetYear);
             if (p?.imageUrl) {
@@ -144,7 +143,7 @@ export function ScreenChat({ onContinue, profile, simulation, selfieUploaded }: 
                 />
               );
             }
-            return <Portrait age={olderAge} mood="dim" />;
+            return <Portrait age={olderAge} mood="dim" blurred={!selfieUploaded} />;
           })()}
         </div>
         <div style={{ textAlign: "center" }}>
@@ -590,9 +589,8 @@ export function ScreenTimeline({
             transition: "filter 600ms var(--ease)",
           }}
         >
-          <Portrait age={currentAge} mood={mood} fadeKey={pickPortraitAge(currentAge)} blurred={!selfieUploaded} />
           {(() => {
-            const p = nearestPortrait(simulation?.agedPortraits, "high", currentYear);
+            const p = nearestPortrait(simulation?.agedPortraits, "high", currentYear, Infinity);
             if (p?.imageUrl) {
               return (
                 <img
@@ -607,7 +605,14 @@ export function ScreenTimeline({
                 />
               );
             }
-            return <Portrait age={currentAge} mood={mood} fadeKey={pickPortraitAge(currentAge)} />;
+            return (
+              <Portrait
+                age={currentAge}
+                mood={mood}
+                fadeKey={pickPortraitAge(currentAge)}
+                blurred={!selfieUploaded}
+              />
+            );
           })()}
         </div>
         <div style={{ textAlign: "center" }}>
@@ -1152,7 +1157,6 @@ export function ScreenSlider({
             transition: "filter 700ms var(--ease)",
           }}
         >
-          <Portrait age={finalAge} mood={mood} fadeKey={isLow ? "low" : "high"} blurred={!selfieUploaded} />
           {(() => {
             const p = nearestPortrait(simulation?.agedPortraits, isLow ? "low" : "high", endYear);
             if (p?.imageUrl) {
@@ -1170,7 +1174,14 @@ export function ScreenSlider({
                 />
               );
             }
-            return <Portrait age={finalAge} mood={mood} fadeKey={isLow ? "low" : "high"} />;
+            return (
+              <Portrait
+                age={finalAge}
+                mood={mood}
+                fadeKey={isLow ? "low" : "high"}
+                blurred={!selfieUploaded}
+              />
+            );
           })()}
         </div>
         <div style={{ textAlign: "center", transition: "color 600ms var(--ease)" }}>
@@ -1475,7 +1486,6 @@ function FutureColumn({
         {label}
       </Meta>
       <div style={{ width: "100%", height: "min(50vh, 460px)", flexShrink: 0, marginBottom: 24 }}>
-        <Portrait age={age} mood={portraitMood} fadeKey={fadeKey} blurred={blurred} />
         {(() => {
           const p = nearestPortrait(portraits, trajectory, endYear);
           if (p?.imageUrl) {
@@ -1492,7 +1502,7 @@ function FutureColumn({
               />
             );
           }
-          return <Portrait age={age} mood={portraitMood} fadeKey={fadeKey} />;
+          return <Portrait age={age} mood={portraitMood} fadeKey={fadeKey} blurred={blurred} />;
         })()}
       </div>
       <h3

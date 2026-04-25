@@ -92,8 +92,12 @@ const EMPTY_PROFILE: Profile = {
   targetYear: PRESENT_YEAR,
 };
 
+const TRANSITION_MS = 500;
+
 export default function App() {
   const [idx, setIdx] = useState(0);
+  const [prevIdx, setPrevIdx] = useState<number | null>(null);
+  const prevTimerRef = useRef<number | null>(null);
   const [profile, setProfile] = useState<Profile>({ ...EMPTY_PROFILE });
   const [simulation, setSimulationState] = useState<SimulationData | null>(null);
   const [selfie, setSelfie] = useState<Blob | null>(null);
@@ -120,18 +124,45 @@ export default function App() {
     voiceSamplesRef.current.push(blob);
   };
 
-  const go = (i: number) => setIdx(clamp(i, 0, SCREENS.length - 1));
-  const next = () => {
-    setIdx((i) => {
-      if (SCREENS[i].key === "timeline") setTimelineViewed(true);
-      return clamp(i + 1, 0, SCREENS.length - 1);
+  const beginTransition = (from: number) => {
+    setPrevIdx(from);
+    if (prevTimerRef.current) window.clearTimeout(prevTimerRef.current);
+    prevTimerRef.current = window.setTimeout(() => {
+      setPrevIdx(null);
+      prevTimerRef.current = null;
+    }, TRANSITION_MS);
+  };
+  const go = (i: number) => {
+    setIdx((current) => {
+      const target = clamp(i, 0, SCREENS.length - 1);
+      if (target !== current) beginTransition(current);
+      return target;
     });
   };
-  const back = () => setIdx((i) => clamp(i - 1, 0, SCREENS.length - 1));
+  const next = () => {
+    setIdx((i) => {
+      const target = clamp(i + 1, 0, SCREENS.length - 1);
+      if (target === i) return i;
+      if (SCREENS[i].key === "timeline") setTimelineViewed(true);
+      beginTransition(i);
+      return target;
+    });
+  };
+  const back = () =>
+    setIdx((i) => {
+      const target = clamp(i - 1, 0, SCREENS.length - 1);
+      if (target !== i) beginTransition(i);
+      return target;
+    });
   const jumpTo = (key: string) => {
     const j = SCREENS.findIndex((s) => s.key === key);
-    if (j >= 0) setIdx(j);
+    if (j >= 0) go(j);
   };
+  useEffect(() => {
+    return () => {
+      if (prevTimerRef.current) window.clearTimeout(prevTimerRef.current);
+    };
+  }, []);
   const restart = () => {
     setSimulationState(null);
     setTimelineViewed(false);
@@ -261,35 +292,56 @@ export default function App() {
   }, []);
 
   const Active = SCREENS[idx].component;
+  const Prev = prevIdx !== null ? SCREENS[prevIdx].component : null;
+
+  const screenProps: ScreenProps = {
+    onContinue: next,
+    onBack: back,
+    onJumpTo: jumpTo,
+    onRestart: restart,
+    profile,
+    setProfile,
+    simulation,
+    setSimulation,
+    timelineViewed,
+    setTimelineViewed,
+    selfieUploaded,
+    setSelfieUploaded,
+    pushVoiceSample,
+    selfie,
+    setSelfie,
+    simStreamPhase,
+    agentCount,
+    outline,
+    latestTitle,
+    portraitsDone,
+    mergePortrait,
+    runSimulate,
+    errorMessage,
+  };
+
+  const noop = () => {};
+  const leavingProps: ScreenProps = {
+    ...screenProps,
+    onContinue: noop,
+    onBack: noop,
+    onJumpTo: noop,
+    onRestart: noop,
+  };
 
   return (
     <div id="stage" className="grain" data-screen-label={SCREENS[idx].label}>
-      <div key={SCREENS[idx].key} className="screen active">
-        <Active
-          onContinue={next}
-          onBack={back}
-          onJumpTo={jumpTo}
-          onRestart={restart}
-          profile={profile}
-          setProfile={setProfile}
-          simulation={simulation}
-          setSimulation={setSimulation}
-          timelineViewed={timelineViewed}
-          setTimelineViewed={setTimelineViewed}
-          selfieUploaded={selfieUploaded}
-          setSelfieUploaded={setSelfieUploaded}
-          pushVoiceSample={pushVoiceSample}
-          selfie={selfie}
-          setSelfie={setSelfie}
-          simStreamPhase={simStreamPhase}
-          agentCount={agentCount}
-          outline={outline}
-          latestTitle={latestTitle}
-          portraitsDone={portraitsDone}
-          mergePortrait={mergePortrait}
-          runSimulate={runSimulate}
-          errorMessage={errorMessage}
-        />
+      {Prev && prevIdx !== null && (
+        <div
+          key={`prev-${SCREENS[prevIdx].key}-${prevIdx}`}
+          className="screen leaving"
+          aria-hidden="true"
+        >
+          <Prev {...leavingProps} />
+        </div>
+      )}
+      <div key={SCREENS[idx].key} className="screen entering">
+        <Active {...screenProps} />
       </div>
 
       <div className="devnav">
