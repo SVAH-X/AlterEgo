@@ -3,11 +3,15 @@ from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
 
 from app.models import Profile, SimulationData
 from app.services.orchestrator import stream_branched_simulation, stream_simulation
 
 router = APIRouter()
+
+# Defense-in-depth cap; the frontend already downscales to ~1024px before upload.
+MAX_SELFIE_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
 @router.post("")
@@ -47,7 +51,7 @@ async def simulate_branch(
     p = _parse_profile(profile)
     try:
         original = SimulationData.model_validate_json(original_simulation)
-    except Exception as e:  # noqa: BLE001
+    except ValidationError as e:
         raise HTTPException(status_code=422, detail=f"original_simulation: {e}")
     selfie_bytes, selfie_mime = await _read_selfie(selfie)
 
@@ -70,14 +74,19 @@ async def simulate_branch(
 def _parse_profile(raw: str) -> Profile:
     try:
         return Profile.model_validate_json(raw)
-    except Exception as e:  # noqa: BLE001
+    except ValidationError as e:
         raise HTTPException(status_code=422, detail=f"profile: {e}")
 
 
 async def _read_selfie(selfie: UploadFile | None) -> tuple[bytes | None, str]:
     if selfie is None:
         return None, "image/jpeg"
-    data = await selfie.read()
+    data = await selfie.read(MAX_SELFIE_BYTES + 1)
+    if len(data) > MAX_SELFIE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"selfie exceeds {MAX_SELFIE_BYTES // (1024 * 1024)} MB",
+        )
     return data, selfie.content_type or "image/jpeg"
 
 
