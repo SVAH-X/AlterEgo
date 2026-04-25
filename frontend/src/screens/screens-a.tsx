@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
-import type { ScreenProps } from "../App";
 import type { ScreenProps, SimStreamPhase } from "../App";
 import { CornerLabel, Mark, Meta, Portrait, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
+import { MicButton } from "../lib/mic";
 import { nearestPortrait } from "../lib/portraits";
 import type { Profile } from "../types";
 import romanStatue from "../assets/roman-half-blur.png";
@@ -29,7 +29,6 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
   return (
     <div style={{ height: "100%", position: "relative", overflow: "hidden" }}>
       <div className="mark-anchor">
-      <div style={{ position: "absolute", top: 32, left: 32, zIndex: 2 }}>
         <Mark />
       </div>
       <CornerLabel pos="tr">v 0.3 · simulation build</CornerLabel>
@@ -58,15 +57,6 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
           padding: "100px clamp(56px, 6vw, 96px) 140px",
           gap: "clamp(32px, 4vw, 72px)",
           boxSizing: "border-box",
-      {/* Hero grid: oversized stacked wordmark · arched portrait */}
-      <div
-        style={{
-          height: "100%",
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1.25fr) minmax(0, 1fr)",
-          alignItems: "center",
-          padding: "100px clamp(56px, 6vw, 96px) 100px",
-          gap: "clamp(32px, 4vw, 72px)",
           animation: "fade-in 1100ms var(--ease) 200ms both",
         }}
       >
@@ -120,48 +110,6 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
             <br />
             <span style={{ color: "var(--accent)" }}>see where your life is heading</span>
           </div>
-          <button
-            onClick={onContinue}
-            aria-label="Begin — see where your life is heading"
-            className="landing-cta"
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: 0,
-              cursor: "pointer",
-              color: "var(--ink-1)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 14,
-              animation: "fade-in 900ms var(--ease) 1300ms both",
-            }}
-          >
-            <div
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 11,
-                letterSpacing: "0.22em",
-                textTransform: "uppercase",
-                lineHeight: 1.7,
-                textAlign: "center",
-              }}
-            >
-              See where your
-              <br />
-              life is heading.
-            </div>
-            <div
-              style={{
-                fontFamily: "var(--serif)",
-                fontSize: 22,
-                color: "var(--accent)",
-                transition: "transform 500ms var(--ease)",
-              }}
-            >
-              ↓
-            </div>
-          </button>
         </div>
 
         <div
@@ -226,20 +174,7 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
         skip · proceed without a photo →
       </button>
 
-      <div
-        style={{
-          position: "absolute",
-          bottom: 32,
-          right: 40,
-          fontFamily: "var(--mono)",
-          fontSize: 10,
-          letterSpacing: "0.22em",
-          textTransform: "uppercase",
-          color: "var(--ink-3)",
-          animation: "fade-in 900ms var(--ease) 1900ms both",
-        }}
-      >
-      {/* Runtime caption — pinned bottom */}
+      {/* Runtime caption — pinned bottom-right */}
       <div
         style={{
           position: "absolute",
@@ -295,7 +230,7 @@ function autoSizeTextarea(el: HTMLTextAreaElement | null) {
   el.style.height = `${el.scrollHeight}px`;
 }
 
-export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
+export function ScreenIntake({ onContinue, profile, setProfile, pushVoiceSample }: ScreenProps) {
   const [step, setStep] = useState(0);
   const cur = INTAKE_FIELDS[step];
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -312,6 +247,36 @@ export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
   const value = isYearsAheadField
     ? Math.max(0, profile.targetYear - profile.presentYear)
     : profile[cur.key];
+
+  // One setter for both keystrokes and live transcripts. Voice input on a
+  // number field arrives chatty ("about thirty two years"), so we extract
+  // the first integer; if no digit shows up yet we hold the previous value
+  // instead of clobbering it with 0.
+  function applyValue(raw: string, source: "type" | "voice") {
+    if (cur.type !== "number") {
+      setProfile({ ...profile, [cur.key]: raw });
+      return;
+    }
+    let n: number;
+    if (source === "voice") {
+      const m = raw.match(/-?\d+/);
+      if (!m) return;
+      n = Number(m[0]);
+    } else {
+      // Strip anything that isn't a digit so users can't paste
+      // non-numeric content; empty string is allowed (clears field).
+      const digits = raw.replace(/[^0-9]/g, "");
+      n = digits === "" ? 0 : Number(digits);
+    }
+    if (isYearsAheadField) {
+      setProfile({
+        ...profile,
+        targetYear: profile.presentYear + (Number.isFinite(n) ? n : 0),
+      });
+    } else {
+      setProfile({ ...profile, [cur.key]: Number.isFinite(n) ? n : 0 });
+    }
+  }
 
   // Number inputs show "" for 0 so the field reads as empty when cleared.
   // Text inputs show their string verbatim (empty string already renders empty).
@@ -379,7 +344,7 @@ export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
               value={displayValue}
               onChange={(e) => {
                 autoSizeTextarea(e.currentTarget);
-                setProfile({ ...profile, [cur.key]: e.target.value });
+                applyValue(e.target.value, "type");
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) next();
@@ -394,33 +359,17 @@ export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
               pattern={cur.type === "number" ? "[0-9]*" : undefined}
               placeholder={cur.placeholder}
               value={displayValue}
-              onChange={(e) => {
-                if (cur.type === "number") {
-                  // Strip anything that isn't a digit so users can't paste
-                  // non-numeric content; empty string is allowed (clears field).
-                  const digits = e.target.value.replace(/[^0-9]/g, "");
-                  const n = digits === "" ? 0 : Number(digits);
-                  if (isYearsAheadField) {
-                    setProfile({
-                      ...profile,
-                      targetYear:
-                        profile.presentYear + (Number.isFinite(n) ? n : 0),
-                    });
-                  } else {
-                    setProfile({
-                      ...profile,
-                      [cur.key]: Number.isFinite(n) ? n : 0,
-                    });
-                  }
-                } else {
-                  setProfile({ ...profile, [cur.key]: e.target.value });
-                }
-              }}
+              onChange={(e) => applyValue(e.target.value, "type")}
               onKeyDown={(e) => {
                 if (e.key === "Enter") next();
               }}
             />
           )}
+
+          <MicButton
+            onTranscript={(text) => applyValue(text, "voice")}
+            onAudioBlob={pushVoiceSample}
+          />
 
           {cur.suffix && (
             <div

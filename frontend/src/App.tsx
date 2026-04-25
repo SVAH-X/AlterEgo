@@ -48,6 +48,7 @@ export interface ScreenProps {
   setTimelineViewed: (v: boolean) => void;
   selfieUploaded: boolean;
   setSelfieUploaded: (v: boolean) => void;
+  pushVoiceSample: (blob: Blob) => void;
   selfie: Blob | null;
   setSelfie: (s: Blob | null) => void;
   simStreamPhase: SimStreamPhase;
@@ -110,6 +111,15 @@ export default function App() {
   // Track an active stream so we don't fire two consumers concurrently.
   const streamingRef = useRef(false);
 
+  // Audio Blobs collected from MicButton during intake. Held in a ref because
+  // nothing in the render path consumes them — they sit here as the "port" for
+  // the future ElevenLabs voice-cloning pipeline (POST the concatenation to
+  // /elevenlabs/clone, persist voice_id on the profile).
+  const voiceSamplesRef = useRef<Blob[]>([]);
+  const pushVoiceSample = (blob: Blob) => {
+    voiceSamplesRef.current.push(blob);
+  };
+
   const go = (i: number) => setIdx(clamp(i, 0, SCREENS.length - 1));
   const next = () => {
     setIdx((i) => {
@@ -134,6 +144,7 @@ export default function App() {
     setPortraitsDone(0);
     setErrorMessage(null);
     streamingRef.current = false;
+    voiceSamplesRef.current = [];
     setIdx(0);
   };
 
@@ -267,6 +278,7 @@ export default function App() {
           setTimelineViewed={setTimelineViewed}
           selfieUploaded={selfieUploaded}
           setSelfieUploaded={setSelfieUploaded}
+          pushVoiceSample={pushVoiceSample}
           selfie={selfie}
           setSelfie={setSelfie}
           simStreamPhase={simStreamPhase}

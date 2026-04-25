@@ -211,9 +211,10 @@ def render_branched_planning_user(
     agent_lines = "\n".join(
         f"- {a.agent_id} ({a.role}): {a.name} — {a.relationship}" for a in agents
     )
+    mbti_line = f"\n- MBTI: {profile.mbti}" if profile.mbti else ""
     return f"""\
 Profile:
-- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk
+- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{mbti_line}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
 - horizon: {profile.presentYear} to {profile.targetYear}
@@ -342,9 +343,10 @@ honestly even if the act itself is referenced obliquely.)
 7. The world's macro events (recession, AI displacement, climate, etc.) \
 still happen on their own timing. They just land differently on a \
 person making a different choice."""
+    mbti_line = f"\n- MBTI: {profile.mbti}" if profile.mbti else ""
     return f"""\
 Profile:
-- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk
+- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{mbti_line}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
 - horizon: {profile.presentYear} to {profile.targetYear} ({profile.targetYear - profile.presentYear} years)
