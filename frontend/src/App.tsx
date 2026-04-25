@@ -16,6 +16,9 @@ import {
   ScreenTimeline,
 } from "./screens/screens-b";
 import { ScreenSelfie } from "./screens/screen-selfie";
+import { VoiceModeToggle } from "./voice/VoiceModeToggle";
+import { useVoice } from "./voice/VoiceContext";
+import { deleteVoice } from "./lib/voice";
 
 export type SimStreamPhase =
   | "idle"
@@ -110,6 +113,8 @@ export default function App() {
   // Track an active stream so we don't fire two consumers concurrently.
   const streamingRef = useRef(false);
 
+  const { clonedVoiceId, setClonedVoiceId, clearIntakeSamples } = useVoice();
+
   const go = (i: number) => setIdx(clamp(i, 0, SCREENS.length - 1));
   const next = () => {
     setIdx((i) => {
@@ -123,6 +128,9 @@ export default function App() {
     if (j >= 0) setIdx(j);
   };
   const restart = () => {
+    if (clonedVoiceId) deleteVoice(clonedVoiceId);
+    setClonedVoiceId(null);
+    clearIntakeSamples();
     setSimulationState(null);
     setTimelineViewed(false);
     setSelfieUploaded(false);
@@ -279,6 +287,8 @@ export default function App() {
           errorMessage={errorMessage}
         />
       </div>
+
+      <VoiceModeToggle />
 
       <div className="devnav">
         {SCREENS.map((s, i) => (

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import chat, health, simulate
+from app.api import chat, health, simulate, voice
 from app.config import get_settings
 
 app = FastAPI(
@@ -23,3 +23,4 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(simulate.router, prefix="/simulate", tags=["simulate"])
 app.include_router(chat.router, prefix="/chat", tags=["chat"])
+app.include_router(voice.router, tags=["voice"])

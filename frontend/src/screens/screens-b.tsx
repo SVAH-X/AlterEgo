@@ -15,6 +15,9 @@ import { AE_DATA } from "../data";
 import { chat, simulateBranchStream } from "../lib/api";
 import { nearestPortrait } from "../lib/portraits";
 import type { AgedPortrait, Checkpoint, Tone, Trajectory } from "../types";
+import { useVoice, useVoicePrimed } from "../voice/VoiceContext";
+import { useTTSPlayer } from "../voice/useTTSPlayer";
+import { MicButton } from "../voice/MicButton";
 
 const TONE_COLOR: Record<Tone, string> = {
   warn: "var(--warn)",
@@ -37,6 +40,10 @@ export function ScreenChat({ onContinue, profile, simulation, selfieUploaded }: 
   const replies = simulation?.futureSelfReplies ?? AE_DATA.futureSelfReplies;
   const suggestions = Object.keys(replies);
 
+  const { voiceMode, clonedVoiceId } = useVoice();
+  const voicePrimed = useVoicePrimed();
+  const tts = useTTSPlayer();
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "future", text: opening, done: true },
   ]);
@@ -49,6 +56,14 @@ export function ScreenChat({ onContinue, profile, simulation, selfieUploaded }: 
     setMessages((m) => [...m, { role: "future", text: pending, done: true }]);
     setPending(null);
   });
+
+  // Auto-play each new future-self utterance in the cloned voice.
+  useEffect(() => {
+    if (!pending) return;
+    if (!voiceMode || !voicePrimed) return;
+    tts.play(pending, clonedVoiceId ?? undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending, voiceMode, voicePrimed, clonedVoiceId]);
 
   const askTimer = useRef<ReturnType<typeof setTimeout>>();
   async function ask(q: string) {
@@ -83,6 +98,14 @@ export function ScreenChat({ onContinue, profile, simulation, selfieUploaded }: 
     setPending(answer);
   }
   useEffect(() => () => { if (askTimer.current) clearTimeout(askTimer.current); }, []);
+
+  // Auto-play the opening on entry (it's a `done: true` message, so the
+  // pending-effect above doesn't catch it).
+  useEffect(() => {
+    if (voiceMode && voicePrimed) tts.play(opening, clonedVoiceId ?? undefined);
+    return () => tts.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   // Track whether the user is near the bottom. If they've scrolled up to read,
@@ -273,6 +296,17 @@ export function ScreenChat({ onContinue, profile, simulation, selfieUploaded }: 
               }}
               disabled={!!pending || thinking}
             />
+            {voiceMode && (
+              <MicButton
+                size="sm"
+                disabled={!!pending || thinking}
+                onTranscript={(t) => {
+                  const q = t.trim();
+                  if (q) ask(q);
+                }}
+                title="Speak your question"
+              />
+            )}
             <button className="under" onClick={onContinue}>
               see the years between →
             </button>
@@ -905,6 +939,16 @@ function InterventionEditor({
   onCancel: () => void;
   onSubmit: () => void;
 }) {
+  const { voiceMode, clonedVoiceId } = useVoice();
+  const voicePrimed = useVoicePrimed();
+  const tts = useTTSPlayer();
+  const prompt =
+    "What would you do differently this year? The trajectory will rewrite from here.";
+  useEffect(() => {
+    if (voiceMode && voicePrimed) tts.play(prompt, clonedVoiceId ?? undefined);
+    return () => tts.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div
       className="card"
@@ -927,20 +971,31 @@ function InterventionEditor({
           lineHeight: 1.5,
         }}
       >
-        What would you do differently this year? The trajectory will rewrite from here.
+        {prompt}
       </div>
-      <textarea
-        className="field"
-        autoFocus
-        rows={3}
-        placeholder="I would refuse the promotion. I would call my sister."
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSubmit();
-          if (e.key === "Escape") onCancel();
-        }}
-      />
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+        <textarea
+          className="field"
+          autoFocus
+          rows={3}
+          style={{ flex: 1, minWidth: 0 }}
+          placeholder="I would refuse the promotion. I would call my sister."
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSubmit();
+            if (e.key === "Escape") onCancel();
+          }}
+        />
+        {voiceMode && (
+          <div style={{ paddingTop: 8 }}>
+            <MicButton
+              onTranscript={(t) => setText((text ? text + " " : "") + t)}
+              title="Speak your intervention"
+            />
+          </div>
+        )}
+      </div>
       <div
         style={{
           display: "flex",
@@ -1328,6 +1383,25 @@ export function ScreenEncore({ onRestart, profile, simulation, selfieUploaded }:
   const replies = simulation?.futureSelfReplies ?? AE_DATA.futureSelfReplies;
   const changeReply = replies["What should I change?"];
   const portraits = simulation?.agedPortraits;
+
+  const { voiceMode, clonedVoiceId } = useVoice();
+  const voicePrimed = useVoicePrimed();
+  const tts = useTTSPlayer();
+  const finalLine = changeReply.split(".")[0] + ".";
+  useEffect(() => {
+    if (voiceMode && voicePrimed) {
+      // Brief delay so the visual fade finishes before the voice arrives.
+      const id = setTimeout(
+        () => tts.play(finalLine, clonedVoiceId ?? undefined),
+        1200,
+      );
+      return () => {
+        clearTimeout(id);
+        tts.stop();
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div

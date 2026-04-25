@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
-import type { ScreenProps } from "../App";
 import type { ScreenProps, SimStreamPhase } from "../App";
 import { CornerLabel, Mark, Meta, Portrait, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
@@ -8,6 +7,10 @@ import { nearestPortrait } from "../lib/portraits";
 import type { Profile } from "../types";
 import romanStatue from "../assets/roman-half-blur.png";
 import darkClouds from "../assets/dark-grey-clouds-over-the-ocean.jpg";
+import { useVoice, useVoicePrimed } from "../voice/VoiceContext";
+import { useTTSPlayer } from "../voice/useTTSPlayer";
+import { MicButton } from "../voice/MicButton";
+import { cloneVoice } from "../lib/voice";
 
 export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -29,7 +32,6 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
   return (
     <div style={{ height: "100%", position: "relative", overflow: "hidden" }}>
       <div className="mark-anchor">
-      <div style={{ position: "absolute", top: 32, left: 32, zIndex: 2 }}>
         <Mark />
       </div>
       <CornerLabel pos="tr">v 0.3 · simulation build</CornerLabel>
@@ -58,15 +60,6 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
           padding: "100px clamp(56px, 6vw, 96px) 140px",
           gap: "clamp(32px, 4vw, 72px)",
           boxSizing: "border-box",
-      {/* Hero grid: oversized stacked wordmark · arched portrait */}
-      <div
-        style={{
-          height: "100%",
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1.25fr) minmax(0, 1fr)",
-          alignItems: "center",
-          padding: "100px clamp(56px, 6vw, 96px) 100px",
-          gap: "clamp(32px, 4vw, 72px)",
           animation: "fade-in 1100ms var(--ease) 200ms both",
         }}
       >
@@ -226,19 +219,6 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
         skip · proceed without a photo →
       </button>
 
-      <div
-        style={{
-          position: "absolute",
-          bottom: 32,
-          right: 40,
-          fontFamily: "var(--mono)",
-          fontSize: 10,
-          letterSpacing: "0.22em",
-          textTransform: "uppercase",
-          color: "var(--ink-3)",
-          animation: "fade-in 900ms var(--ease) 1900ms both",
-        }}
-      >
       {/* Runtime caption — pinned bottom */}
       <div
         style={{
@@ -299,8 +279,42 @@ export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
   const [step, setStep] = useState(0);
   const cur = INTAKE_FIELDS[step];
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const { voiceMode, pushIntakeSample, pushIntakeSeconds } = useVoice();
+  const voicePrimed = useVoicePrimed();
+  const tts = useTTSPlayer();
+
+  // Auto-play the current question when entering voice mode.
+  useEffect(() => {
+    if (voiceMode && voicePrimed) tts.play(cur.label);
+    else tts.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, voiceMode, voicePrimed]);
+
+  function applyTranscript(text: string) {
+    if (cur.type === "number") {
+      const digits = text.replace(/[^0-9]/g, "");
+      if (!digits) return;
+      const n = Number(digits);
+      if (cur.key === "targetYear") {
+        setProfile({ ...profile, targetYear: profile.presentYear + n });
+      } else {
+        setProfile({ ...profile, [cur.key]: n });
+      }
+    } else {
+      setProfile({ ...profile, [cur.key]: text });
+    }
+  }
+
+  function onRecorded(blob: Blob, durationMs: number) {
+    // Open-ended fields make the best cloning samples.
+    if (cur.type === "textarea" || cur.type === "text") {
+      pushIntakeSample(blob);
+      pushIntakeSeconds(durationMs / 1000);
+    }
+  }
 
   function next() {
+    tts.stop();
     if (step < INTAKE_FIELDS.length - 1) setStep(step + 1);
     else onContinue();
   }
@@ -369,58 +383,69 @@ export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
           >
             {cur.label}
           </label>
-          {cur.type === "textarea" ? (
-            <textarea
-              ref={textareaRef}
-              className="field auto-grow"
-              rows={1}
-              autoFocus
-              placeholder={cur.placeholder}
-              value={displayValue}
-              onChange={(e) => {
-                autoSizeTextarea(e.currentTarget);
-                setProfile({ ...profile, [cur.key]: e.target.value });
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) next();
-              }}
-            />
-          ) : (
-            <input
-              className="field"
-              autoFocus
-              type={cur.type === "number" ? "text" : cur.type}
-              inputMode={cur.type === "number" ? "numeric" : undefined}
-              pattern={cur.type === "number" ? "[0-9]*" : undefined}
-              placeholder={cur.placeholder}
-              value={displayValue}
-              onChange={(e) => {
-                if (cur.type === "number") {
-                  // Strip anything that isn't a digit so users can't paste
-                  // non-numeric content; empty string is allowed (clears field).
-                  const digits = e.target.value.replace(/[^0-9]/g, "");
-                  const n = digits === "" ? 0 : Number(digits);
-                  if (isYearsAheadField) {
-                    setProfile({
-                      ...profile,
-                      targetYear:
-                        profile.presentYear + (Number.isFinite(n) ? n : 0),
-                    });
-                  } else {
-                    setProfile({
-                      ...profile,
-                      [cur.key]: Number.isFinite(n) ? n : 0,
-                    });
-                  }
-                } else {
-                  setProfile({ ...profile, [cur.key]: e.target.value });
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") next();
-              }}
-            />
-          )}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {cur.type === "textarea" ? (
+                <textarea
+                  ref={textareaRef}
+                  className="field auto-grow"
+                  rows={1}
+                  autoFocus
+                  placeholder={cur.placeholder}
+                  value={displayValue}
+                  onChange={(e) => {
+                    autoSizeTextarea(e.currentTarget);
+                    setProfile({ ...profile, [cur.key]: e.target.value });
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) next();
+                  }}
+                />
+              ) : (
+                <input
+                  className="field"
+                  autoFocus
+                  type={cur.type === "number" ? "text" : cur.type}
+                  inputMode={cur.type === "number" ? "numeric" : undefined}
+                  pattern={cur.type === "number" ? "[0-9]*" : undefined}
+                  placeholder={cur.placeholder}
+                  value={displayValue}
+                  onChange={(e) => {
+                    if (cur.type === "number") {
+                      const digits = e.target.value.replace(/[^0-9]/g, "");
+                      const n = digits === "" ? 0 : Number(digits);
+                      if (isYearsAheadField) {
+                        setProfile({
+                          ...profile,
+                          targetYear:
+                            profile.presentYear + (Number.isFinite(n) ? n : 0),
+                        });
+                      } else {
+                        setProfile({
+                          ...profile,
+                          [cur.key]: Number.isFinite(n) ? n : 0,
+                        });
+                      }
+                    } else {
+                      setProfile({ ...profile, [cur.key]: e.target.value });
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") next();
+                  }}
+                />
+              )}
+            </div>
+            {voiceMode && (
+              <div style={{ paddingTop: cur.type === "textarea" ? 8 : 14 }}>
+                <MicButton
+                  onTranscript={applyTranscript}
+                  onRecorded={onRecorded}
+                  title="Speak your answer"
+                />
+              </div>
+            )}
+          </div>
 
           {cur.suffix && (
             <div
@@ -502,6 +527,26 @@ export function ScreenProcessing({
 }: ScreenProps) {
   const [elapsedMs, setElapsedMs] = useState(0);
   const mountedAtRef = useRef(Date.now());
+  const { intakeSamples, intakeSamplesSeconds, setClonedVoiceId } = useVoice();
+
+  // Voice cloning runs in parallel with /simulate. Skip if no samples or
+  // the audio is too short to produce a usable clone (~5s minimum).
+  useEffect(() => {
+    if (intakeSamples.length === 0 || intakeSamplesSeconds < 5) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const id = await cloneVoice(intakeSamples, `alterego-${Date.now()}`);
+        if (!cancelled) setClonedVoiceId(id);
+      } catch (e) {
+        console.warn("voice clone failed:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startYear = profile.presentYear || 2026;
   const endYear = profile.targetYear || 2046;
@@ -813,6 +858,9 @@ type RevealPhase = 0 | 1 | 2 | 3;
 
 export function ScreenReveal({ onContinue, profile, simulation, selfieUploaded }: ScreenProps) {
   const [phase, setPhase] = useState<RevealPhase>(0);
+  const { voiceMode, clonedVoiceId } = useVoice();
+  const voicePrimed = useVoicePrimed();
+  const tts = useTTSPlayer();
   useEffect(() => {
     const t1 = setTimeout(() => setPhase(1), 900);
     const t2 = setTimeout(() => setPhase(2), 3400);
@@ -824,6 +872,15 @@ export function ScreenReveal({ onContinue, profile, simulation, selfieUploaded }
 
   const opening = simulation?.futureSelfOpening ?? AE_DATA.futureSelfOpening;
   const streamed = useStreamedText(opening, 24, phase >= 3);
+
+  // Auto-play the opening in the cloned voice (if available) when phase 3 hits.
+  useEffect(() => {
+    if (phase >= 3 && voiceMode && voicePrimed) {
+      tts.play(opening, clonedVoiceId ?? undefined);
+    }
+    return () => tts.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, voiceMode, voicePrimed, opening, clonedVoiceId]);
 
   const olderAge =
     (Number(profile.age) || 32) +

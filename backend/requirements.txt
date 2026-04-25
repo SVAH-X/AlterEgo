@@ -7,7 +7,7 @@ python-multipart>=0.0.12
 anthropic>=0.40
 groq>=0.13
 openai>=1.55
-elevenlabs>=1.10
+elevenlabs>=1.50
 google-genai>=0.3
 
 # dev
