@@ -6,7 +6,6 @@ import {
   Meta,
   Portrait,
   Wave,
-  clamp,
   pickPortraitAge,
   useStreamedText,
 } from "../atoms";
@@ -14,7 +13,7 @@ import type { PortraitMood } from "../atoms";
 import { AE_DATA } from "../data";
 import { chat, simulateBranchStream } from "../lib/api";
 import { nearestPortrait } from "../lib/portraits";
-import type { AgedPortrait, Checkpoint, Tone, Trajectory } from "../types";
+import type { Checkpoint, Tone } from "../types";
 import { useVoice, useVoicePrimed } from "../voice/VoiceContext";
 import { useTTSPlayer } from "../voice/useTTSPlayer";
 import { MicButton } from "../voice/MicButton";
@@ -307,7 +306,7 @@ export function ScreenChat({ onContinue, profile, simulation, selfieUploaded }: 
               />
             )}
             <button className="under" onClick={onContinue}>
-              see the years between →
+              the end →
             </button>
           </div>
         </div>
@@ -777,7 +776,7 @@ export function ScreenTimeline({
             {autoplay ? `playing · ${startYear} → ${endYear}` : `scrub · ${startYear} → ${endYear}`}
           </Meta>
           <button className="under" onClick={onContinue}>
-            change one thing →
+            meet your future self →
           </button>
         </div>
         <input
@@ -1145,265 +1144,24 @@ function GeneratingCard({
   );
 }
 
-export function ScreenSlider({
-  onContinue,
-  onBack,
-  profile,
-  simulation,
-  setTimelineViewed,
-  selfieUploaded,
-}: ScreenProps) {
-  // Reaching the slider always counts as having seen the timeline. Going back
-  // from here should drop the user straight into intervention mode (all events
-  // visible, no auto-play replay), regardless of how they got to the slider.
-  useEffect(() => {
-    setTimelineViewed(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const [hours, setHours] = useState(profile.workHours || 65);
+export function ScreenEnd({ onRestart, profile, simulation, selfieUploaded }: ScreenProps) {
+  const baseAge = profile.age || 32;
   const startYear = profile.presentYear || 2026;
   const endYear = profile.targetYear || 2046;
-  const baseAge = profile.age || 32;
-
-  const isLow = hours <= 50;
-  const high = simulation?.checkpointsHigh ?? AE_DATA.checkpointsHigh;
-  const low = simulation?.checkpointsLow ?? AE_DATA.checkpointsLow;
-  const checkpoints = isLow ? low : high;
-  const finalCp = checkpoints[checkpoints.length - 1];
   const finalAge = baseAge + (endYear - startYear);
 
-  const opt = clamp(1 - (hours - 30) / 60, 0.12, 0.92);
-
-  const mood: PortraitMood = isLow ? "warm" : "dim";
-
-  return (
-    <div
-      style={{
-        height: "100%",
-        position: "relative",
-        display: "grid",
-        gridTemplateColumns: "minmax(360px, 460px) 1fr",
-        overflow: "hidden",
-      }}
-    >
-      <div className="mark-anchor">
-        <Mark />
-      </div>
-      <CornerLabel pos="tr">re-simulate · one variable</CornerLabel>
-
-      <div
-        style={{
-          borderRight: "1px solid var(--line-soft)",
-          padding: "100px 32px 240px",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 26,
-        }}
-      >
-        <div
-          style={{
-            width: "100%",
-            height: "min(56vh, 500px)",
-            flexShrink: 0,
-            maxWidth: 380,
-            transition: "filter 700ms var(--ease)",
-          }}
-        >
-          {(() => {
-            const p = nearestPortrait(simulation?.agedPortraits, isLow ? "low" : "high", endYear);
-            if (p?.imageUrl) {
-              return (
-                <img
-                  src={p.imageUrl}
-                  alt={`you at ${p.age}, ${isLow ? "alternate" : "current"} path`}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    borderRadius: 8,
-                    transition: "filter 700ms var(--ease)",
-                  }}
-                />
-              );
-            }
-            return (
-              <Portrait
-                age={finalAge}
-                mood={mood}
-                fadeKey={isLow ? "low" : "high"}
-                blurred={!selfieUploaded}
-              />
-            );
-          })()}
-        </div>
-        <div style={{ textAlign: "center", transition: "color 600ms var(--ease)" }}>
-          <Meta style={{ marginBottom: 8, color: isLow ? "var(--accent)" : "var(--ink-3)" }}>
-            {endYear} · age {finalAge}
-          </Meta>
-          <div
-            className="serif"
-            style={{
-              fontSize: 22,
-              fontStyle: "italic",
-              color: "var(--ink-1)",
-              maxWidth: 320,
-              margin: "0 auto",
-              lineHeight: 1.4,
-            }}
-          >
-            “{finalCp.consequence}”
-          </div>
-        </div>
-      </div>
-
-      <div style={{ padding: "100px 60px 280px", overflow: "auto" }}>
-        <div style={{ maxWidth: 760, margin: "0 auto" }}>
-          <Meta style={{ marginBottom: 16 }}>change one thing</Meta>
-          <h2
-            className="serif"
-            style={{
-              fontSize: 40,
-              fontWeight: 400,
-              fontStyle: "italic",
-              margin: 0,
-              marginBottom: 6,
-              lineHeight: 1.15,
-              color: "var(--ink)",
-            }}
-          >
-            What if you worked
-          </h2>
-          <h2
-            className="serif"
-            style={{
-              fontSize: 40,
-              fontWeight: 400,
-              fontStyle: "italic",
-              margin: 0,
-              marginBottom: 44,
-              lineHeight: 1.15,
-              color: "var(--ink)",
-            }}
-          >
-            <span style={{ color: "var(--accent)", transition: "color 500ms" }}>
-              {hours} hours
-            </span>{" "}
-            a week instead?
-          </h2>
-
-          <div style={{ marginBottom: 56 }}>
-            <input
-              type="range"
-              className="fancy accent"
-              min={30}
-              max={80}
-              step={1}
-              value={hours}
-              onChange={(e) => setHours(Number(e.target.value))}
-              style={{ width: "100%" }}
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12 }}>
-              <Meta>30 hrs</Meta>
-              <Meta>80 hrs</Meta>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 48 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "baseline",
-                marginBottom: 14,
-              }}
-            >
-              <Meta>optimistic path probability</Meta>
-              <span
-                className="mono"
-                style={{
-                  fontSize: 16,
-                  color: isLow ? "var(--accent)" : "var(--ink-1)",
-                  letterSpacing: "0.1em",
-                  transition: "color 500ms",
-                }}
-              >
-                {Math.round(opt * 100)}%
-              </span>
-            </div>
-            <div style={{ position: "relative", height: 1, background: "var(--line)" }}>
-              <div
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  top: 0,
-                  height: 1,
-                  width: `${opt * 100}%`,
-                  background: isLow ? "var(--accent)" : "var(--ink-2)",
-                  transition: "width 700ms var(--ease), background 500ms var(--ease)",
-                }}
-              />
-            </div>
-          </div>
-
-          <div style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 32 }}>
-            <Meta style={{ marginBottom: 18 }}>a representative year · {checkpoints[2].year}</Meta>
-            <CheckpointCard c={checkpoints[2]} active visible />
-          </div>
-        </div>
-      </div>
-
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: "20px 60px 28px",
-          borderTop: "1px solid var(--line-soft)",
-          background: "linear-gradient(180deg, transparent, rgba(0,0,0,0.5))",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Meta>{isLow ? "the alternate path" : "the path you're on"}</Meta>
-        <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
-          <button className="under" onClick={onBack}>
-            ← change a specific moment
-          </button>
-          <button className="under" onClick={onContinue}>
-            see them side by side →
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function ScreenEncore({ onRestart, profile, simulation, selfieUploaded }: ScreenProps) {
-  const baseAge = profile.age || 32;
-  const endYear = profile.targetYear || 2046;
-  const finalAge = baseAge + (endYear - (profile.presentYear || 2026));
-  const highCps = simulation?.checkpointsHigh ?? AE_DATA.checkpointsHigh;
-  const lowCps = simulation?.checkpointsLow ?? AE_DATA.checkpointsLow;
-  const high = highCps[highCps.length - 1];
-  const low = lowCps[lowCps.length - 1];
   const replies = simulation?.futureSelfReplies ?? AE_DATA.futureSelfReplies;
-  const changeReply = replies["What should I change?"];
-  const portraits = simulation?.agedPortraits;
+  const changeReply = replies["What should I change?"] ?? "";
+  const closingLine = changeReply ? changeReply.split(".")[0] + "." : "";
 
   const { voiceMode, clonedVoiceId } = useVoice();
   const voicePrimed = useVoicePrimed();
   const tts = useTTSPlayer();
-  const finalLine = changeReply.split(".")[0] + ".";
   useEffect(() => {
+    if (!closingLine) return;
     if (voiceMode && voicePrimed) {
-      // Brief delay so the visual fade finishes before the voice arrives.
       const id = setTimeout(
-        () => tts.play(finalLine, clonedVoiceId ?? undefined),
+        () => tts.play(closingLine, clonedVoiceId ?? undefined),
         1200,
       );
       return () => {
@@ -1421,24 +1179,47 @@ export function ScreenEncore({ onRestart, profile, simulation, selfieUploaded }:
         position: "relative",
         display: "flex",
         flexDirection: "column",
-        padding: "80px 60px 60px",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "80px 60px",
       }}
     >
       <div className="mark-anchor">
         <Mark />
       </div>
-      <CornerLabel pos="tr">two futures · {profile.targetYear || 2046}</CornerLabel>
+      <CornerLabel pos="tr">end · {endYear}</CornerLabel>
 
       <div
         style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 32,
+          maxWidth: 720,
           textAlign: "center",
-          marginBottom: 54,
-          animation: "fade-in 800ms var(--ease) both",
+          animation: "fade-in 1200ms var(--ease) both",
         }}
       >
-        <Meta style={{ marginBottom: 14 }}>
-          {profile.name || "Sarah"} · age {finalAge}
+        <div style={{ width: "min(360px, 32vw)", height: "min(50vh, 460px)" }}>
+          {(() => {
+            const p = nearestPortrait(simulation?.agedPortraits, "high", endYear);
+            if (p?.imageUrl) {
+              return (
+                <img
+                  src={p.imageUrl}
+                  alt={`you at ${p.age}`}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
+                />
+              );
+            }
+            return <Portrait age={finalAge} mood="dim" blurred={!selfieUploaded} />;
+          })()}
+        </div>
+
+        <Meta>
+          {profile.name || "Sarah"} · age {finalAge} · {endYear}
         </Meta>
+
         <h2
           className="serif"
           style={{
@@ -1446,165 +1227,39 @@ export function ScreenEncore({ onRestart, profile, simulation, selfieUploaded }:
             fontWeight: 400,
             fontStyle: "italic",
             margin: 0,
-            lineHeight: 1.15,
+            lineHeight: 1.2,
             color: "var(--ink)",
             letterSpacing: "0.005em",
           }}
         >
-          The same person, twice.
+          The end.
         </h2>
-      </div>
 
-      <div
-        style={{
-          flex: 1,
-          display: "grid",
-          gridTemplateColumns: "1fr 1px 1fr",
-          gap: 60,
-          maxWidth: 1320,
-          width: "100%",
-          margin: "0 auto",
-          alignItems: "stretch",
-        }}
-      >
-        <FutureColumn
-          label="if nothing changes · 65 hrs"
-          portraitMood="dim"
-          age={finalAge}
-          cp={high}
-          accent={false}
-          fadeKey="enc-high"
-          blurred={!selfieUploaded}
-          portraits={portraits}
-          trajectory="high"
-          endYear={endYear}
-        />
-        <div style={{ background: "var(--line-soft)" }} />
-        <FutureColumn
-          label="at 45 hrs"
-          portraitMood="warm"
-          age={finalAge}
-          cp={low}
-          accent
-          fadeKey="enc-low"
-          blurred={!selfieUploaded}
-          portraits={portraits}
-          trajectory="low"
-          endYear={endYear}
-        />
-      </div>
+        {closingLine && (
+          <p
+            className="serif"
+            style={{
+              fontSize: 19,
+              lineHeight: 1.6,
+              fontStyle: "italic",
+              color: "var(--ink-1)",
+              margin: 0,
+              maxWidth: 560,
+            }}
+          >
+            “{closingLine}”
+          </p>
+        )}
 
-      <div
-        style={{
-          borderTop: "1px solid var(--line-soft)",
-          marginTop: 50,
-          paddingTop: 32,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <button className="under" onClick={onRestart}>
-          ← simulate again
-        </button>
-        <div
-          className="serif"
-          style={{
-            fontStyle: "italic",
-            color: "var(--ink-2)",
-            fontSize: 17,
-            maxWidth: 480,
-            textAlign: "center",
-          }}
+        <button
+          className="under"
+          onClick={onRestart}
+          style={{ marginTop: 24, fontSize: 13, letterSpacing: "0.18em" }}
         >
-          “{changeReply.split(".")[0]}.”
-        </div>
-        <button className="btn">Save · share quietly</button>
+          ← begin again
+        </button>
       </div>
     </div>
   );
 }
 
-function FutureColumn({
-  label,
-  portraitMood,
-  age,
-  cp,
-  accent,
-  fadeKey,
-  blurred,
-  portraits,
-  trajectory,
-  endYear,
-}: {
-  label: string;
-  portraitMood: PortraitMood;
-  age: number;
-  cp: Checkpoint;
-  accent: boolean;
-  fadeKey: string;
-  blurred: boolean;
-  portraits?: AgedPortrait[];
-  trajectory: Trajectory;
-  endYear: number;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        animation: "fade-in 1000ms var(--ease) 200ms both",
-      }}
-    >
-      <Meta style={{ marginBottom: 18, color: accent ? "var(--accent)" : "var(--ink-3)" }}>
-        {label}
-      </Meta>
-      <div style={{ width: "100%", height: "min(50vh, 460px)", flexShrink: 0, marginBottom: 24 }}>
-        {(() => {
-          const p = nearestPortrait(portraits, trajectory, endYear);
-          if (p?.imageUrl) {
-            return (
-              <img
-                src={p.imageUrl}
-                alt={`you at ${p.age}, ${trajectory} path`}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  borderRadius: 8,
-                }}
-              />
-            );
-          }
-          return <Portrait age={age} mood={portraitMood} fadeKey={fadeKey} blurred={blurred} />;
-        })()}
-      </div>
-      <h3
-        className="serif"
-        style={{
-          fontSize: 24,
-          fontWeight: 400,
-          fontStyle: "italic",
-          margin: 0,
-          marginBottom: 16,
-          lineHeight: 1.3,
-          color: "var(--ink)",
-        }}
-      >
-        {cp.title}
-      </h3>
-      <p
-        className="serif"
-        style={{
-          fontSize: 17,
-          lineHeight: 1.6,
-          color: "var(--ink-1)",
-          margin: 0,
-          fontStyle: "italic",
-        }}
-      >
-        {cp.consequence}
-      </p>
-    </div>
-  );
-}

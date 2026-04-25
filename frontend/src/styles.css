@@ -457,7 +457,6 @@ input[type="range"].fancy::-webkit-slider-thumb {
   box-shadow: 0 0 0 5px rgba(236,230,220,0.06);
   transition: background 300ms var(--ease);
 }
-input[type="range"].fancy.accent::-webkit-slider-thumb { background: var(--accent); box-shadow: 0 0 0 5px var(--accent-soft); }
 input[type="range"].fancy:active { cursor: grabbing; }
 input[type="range"].fancy::-moz-range-track { height: 1px; background: var(--line); }
 input[type="range"].fancy::-moz-range-thumb { width: 12px; height: 12px; border: none; border-radius: 50%; background: var(--ink); }
