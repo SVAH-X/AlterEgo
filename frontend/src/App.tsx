@@ -98,6 +98,7 @@ const EMPTY_PROFILE: Profile = {
 const TRANSITION_MS = 500;
 
 export default function App() {
+  const { clonedVoiceId, setClonedVoiceId, clearIntakeSamples } = useVoice();
   const [idx, setIdx] = useState(0);
   const [prevIdx, setPrevIdx] = useState<number | null>(null);
   const prevTimerRef = useRef<number | null>(null);

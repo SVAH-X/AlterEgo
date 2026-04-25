@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import type { ScreenProps, SimStreamPhase } from "../App";
 import { CornerLabel, Mark, Meta, Portrait, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
-import { MicButton } from "../lib/mic";
 import { nearestPortrait } from "../lib/portraits";
 import type { Profile } from "../types";
 import romanStatue from "../assets/roman-half-blur.png";
@@ -229,21 +228,6 @@ export function ScreenIntake({ onContinue, profile, setProfile, pushVoiceSample 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, voiceMode, voicePrimed]);
 
-  function applyTranscript(text: string) {
-    if (cur.type === "number") {
-      const digits = text.replace(/[^0-9]/g, "");
-      if (!digits) return;
-      const n = Number(digits);
-      if (cur.key === "targetYear") {
-        setProfile({ ...profile, targetYear: profile.presentYear + n });
-      } else {
-        setProfile({ ...profile, [cur.key]: n });
-      }
-    } else {
-      setProfile({ ...profile, [cur.key]: text });
-    }
-  }
-
   function onRecorded(blob: Blob, durationMs: number) {
     // Open-ended fields make the best cloning samples.
     if (cur.type === "textarea" || cur.type === "text") {
@@ -386,7 +370,10 @@ export function ScreenIntake({ onContinue, profile, setProfile, pushVoiceSample 
 
           <MicButton
             onTranscript={(text) => applyValue(text, "voice")}
-            onAudioBlob={pushVoiceSample}
+            onRecorded={(blob, durationMs) => {
+              onRecorded(blob, durationMs);
+              pushVoiceSample(blob);
+            }}
           />
 
           {cur.suffix && (
