@@ -4,91 +4,165 @@ import { CornerLabel, Mark, Meta, Portrait, Wave, useStreamedText } from "../ato
 import { AE_DATA } from "../data";
 import { simulateStream } from "../lib/api";
 import type { Profile } from "../types";
+import romanStatue from "../assets/roman-half-blur.png";
+import darkClouds from "../assets/dark-grey-clouds-over-the-ocean.jpg";
 
 export function ScreenLanding({ onContinue }: ScreenProps) {
   return (
-    <div
-      className="screen-inner"
-      style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column" }}
-    >
-      <div style={{ position: "absolute", top: 32, left: 32 }}>
+    <div style={{ height: "100%", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: 32, left: 32, zIndex: 2 }}>
         <Mark />
       </div>
       <CornerLabel pos="tr">v 0.3 · simulation build</CornerLabel>
 
+      {/* Hero grid: oversized stacked wordmark · arched portrait */}
       <div
         style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
+          height: "100%",
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1.25fr) minmax(0, 1fr)",
           alignItems: "center",
-          padding: "0 40px",
+          padding: "100px clamp(56px, 6vw, 96px) 100px",
+          gap: "clamp(32px, 4vw, 72px)",
           animation: "fade-in 1100ms var(--ease) 200ms both",
         }}
       >
-        <Meta style={{ marginBottom: 28 }}>a personal future simulation</Meta>
-        <h1
-          className="serif"
-          style={{
-            fontSize: "clamp(56px, 8vw, 112px)",
-            fontWeight: 400,
-            lineHeight: 1.05,
-            textAlign: "center",
-            margin: 0,
-            letterSpacing: "-0.01em",
-            maxWidth: 1100,
-          }}
-        >
-          See where your life
-          <br />
-          is heading.
-        </h1>
-
-        <div style={{ height: 120 }} />
-
-        <button
-          className="btn btn-accent"
-          onClick={onContinue}
-          style={{ animation: "fade-in 900ms var(--ease) 1100ms both" }}
-        >
-          Upload a selfie
-        </button>
         <div
-          className="muted"
           style={{
-            fontSize: 12,
-            marginTop: 18,
-            fontFamily: "var(--mono)",
-            letterSpacing: "0.14em",
-            animation: "fade-in 900ms var(--ease) 1500ms both",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 56,
           }}
         >
-          ~ 8 minutes · honest, not motivational
+          <h1
+            aria-label="Alter Ego"
+            className="serif"
+            style={{
+              fontSize: "clamp(140px, 19vw, 280px)",
+              lineHeight: 0.6,
+              fontWeight: 400,
+              letterSpacing: "-0.025em",
+              margin: 0,
+              padding: "0.35em 0.1em",
+              textAlign: "center",
+              userSelect: "none",
+              backgroundImage: `linear-gradient(rgb(248 182 58 / 38%) 0%, rgb(137 109 82 / 55%) 100%), url(${darkClouds})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center 55%",
+              backgroundRepeat: "no-repeat",
+              backgroundClip: "text",
+              WebkitBackgroundClip: "text",
+              color: "transparent",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            <span style={{ display: "block" }}>alter</span>
+            <span style={{ display: "block" }}>ego</span>
+          </h1>
+
+          <button
+            onClick={onContinue}
+            aria-label="Begin — see where your life is heading"
+            className="landing-cta"
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              color: "var(--ink-1)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 14,
+              animation: "fade-in 900ms var(--ease) 1300ms both",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 11,
+                letterSpacing: "0.22em",
+                textTransform: "uppercase",
+                lineHeight: 1.7,
+                textAlign: "center",
+              }}
+            >
+              See where your
+              <br />
+              life is heading.
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--serif)",
+                fontSize: 22,
+                color: "var(--accent)",
+                transition: "transform 500ms var(--ease)",
+              }}
+            >
+              ↓
+            </div>
+          </button>
+        </div>
+
+        <div
+          style={{
+            position: "relative",
+            justifySelf: "center",
+            width: "min(520px, 100%, 55vh)",
+            aspectRatio: "3 / 4",
+            borderRadius: "50% 50% 0 0 / 32% 32% 0 0",
+            overflow: "hidden",
+            background:
+              "radial-gradient(ellipse at 50% 30%, #87725e 0%, #574a3d 78%)",
+            boxShadow:
+              "inset 0 0 0 1px var(--line-soft), 0 40px 80px -40px rgba(0,0,0,0.65)",
+            animation: "fade-in 1800ms var(--ease) 700ms both",
+          }}
+        >
+          <img
+            src={romanStatue}
+            alt=""
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center 25%",
+              transform: "scale(1.25)",
+              transformOrigin: "50% 25%",
+              filter: "contrast(1.05) saturate(0.9) brightness(1.02) sepia(0.04)",
+            }}
+          />
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: 0,
+              background:
+                "radial-gradient(ellipse at 50% 25%, transparent 60%, rgba(30,22,14,0.45) 100%)",
+              pointerEvents: "none",
+            }}
+          />
         </div>
       </div>
 
+      {/* Runtime caption — pinned bottom */}
       <div
         style={{
           position: "absolute",
-          bottom: 28,
-          left: "50%",
-          transform: "translateX(-50%)",
-          textAlign: "center",
-          animation: "fade-in 1200ms var(--ease) 1800ms both",
+          bottom: 32,
+          right: 40,
+          fontFamily: "var(--mono)",
+          fontSize: 10,
+          letterSpacing: "0.22em",
+          textTransform: "uppercase",
+          color: "var(--ink-3)",
+          animation: "fade-in 900ms var(--ease) 1900ms both",
         }}
       >
-        <div
-          className="serif"
-          style={{
-            fontStyle: "italic",
-            color: "var(--ink-3)",
-            fontSize: 15,
-            letterSpacing: "0.02em",
-          }}
-        >
-          Not an oracle. A mirror with a long view.
-        </div>
+        ~ 8 min · honest, not motivational
       </div>
     </div>
   );
@@ -356,7 +430,7 @@ export function ScreenProcessing({
   const finalizeFrac =
     phase === "finalizing"
       ? RUN_CAP +
-        Math.min(1, finalizeElapsed / FINALIZE_EXPECTED_MS) * (FINAL_CAP - RUN_CAP)
+      Math.min(1, finalizeElapsed / FINALIZE_EXPECTED_MS) * (FINAL_CAP - RUN_CAP)
       : 0;
 
   const markerFrac =
@@ -660,8 +734,8 @@ export function ScreenProcessing({
         {phase === "error"
           ? `${errorMsg?.slice(0, 80) ?? "stream interrupted"} · using sample`
           : usedFallback
-          ? "showing a sample · your version is still cooking"
-          : `${totalEvents > 0 ? totalEvents : "—"} events · ${agentCount > 0 ? agentCount : "—"} people`}
+            ? "showing a sample · your version is still cooking"
+            : `${totalEvents > 0 ? totalEvents : "—"} events · ${agentCount > 0 ? agentCount : "—"} people`}
       </div>
 
       {(phase === "complete" || phase === "error") && (
