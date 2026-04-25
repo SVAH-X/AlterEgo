@@ -51,6 +51,7 @@ export function ScreenSelfie({ onContinue, onBack, selfie, setSelfie }: SelfieSc
     if (state.kind !== "live" || !videoRef.current) return;
     const video = videoRef.current;
     const longest = Math.max(video.videoWidth, video.videoHeight);
+    if (longest === 0) return; // video metadata not yet ready; user can re-snap
     const scale = longest > MAX_EDGE ? MAX_EDGE / longest : 1;
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(video.videoWidth * scale);
@@ -89,6 +90,10 @@ export function ScreenSelfie({ onContinue, onBack, selfie, setSelfie }: SelfieSc
         "image/jpeg",
         0.9,
       );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      // Selected file isn't a renderable image; stay in idle so user can pick again.
     };
     img.src = objectUrl;
   }
