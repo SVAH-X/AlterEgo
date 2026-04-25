@@ -3,17 +3,11 @@ uvicorn[standard]>=0.32
 pydantic>=2.9
 pydantic-settings>=2.6
 python-dotenv>=1.0
-httpx>=0.27
+python-multipart>=0.0.12
 anthropic>=0.40
 groq>=0.13
 openai>=1.55
-motor>=3.6
 elevenlabs>=1.10
-replicate>=1.0
-cloudinary>=1.41
-camel-oasis
-python-multipart>=0.0.12
-structlog>=24.4
 
 # dev
 pytest>=8.3

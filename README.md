@@ -2,55 +2,51 @@
 
 > Your future, simulated.
 
-LA Hacks 2026 · OASIS-grounded personal future simulation.
+LA Hacks 2026 · personal future simulation. A voiced conversation with yourself in twenty years.
 
-See [`AlterEgo Project Brief.md`](AlterEgo%20Project%20Brief.md) for the product brief and [`docs/`](docs/) for the strategy and build docs.
+See [`docs/CLAUDE.md`](docs/CLAUDE.md) for the canonical product spec, [`docs/CHAMPION_STRATEGY.md`](docs/CHAMPION_STRATEGY.md) for track and sponsor reasoning, and [`docs/PROJECT_BUILD_SUMMARY.md`](docs/PROJECT_BUILD_SUMMARY.md) for the build plan.
 
 ## Repo layout
 
 ```
 alterego/
-├── backend/        FastAPI service — simulation, routing, OASIS orchestration, voice
-├── frontend/       Next.js app (TBD — tooling not yet selected)
-├── agent/          Optional Fetch.ai uAgent sidecar (mailbox mode, ~100 LOC)
-├── oasis_ext/      Our customizations on top of `pip install camel-oasis`
-├── scripts/        setup.sh, dev.sh, seed_world_events.py
+├── backend/        FastAPI service — /simulate, /chat, /chat/voice
+├── frontend/       Vite + React 18 (lives on origin/frontend/initial-design)
+├── agent/          Optional Fetch.ai uAgent sidecar (only if core stable)
+├── oasis_ext/      Future direction (multi-agent OASIS layer; not wired in yet)
+├── scripts/        setup.sh, dev.sh
 ├── docs/           CLAUDE.md, CHAMPION_STRATEGY.md, PROJECT_BUILD_SUMMARY.md
-├── legacy/         Archived simple-function direction (reference only)
-└── AlterEgo Project Brief.{md,pdf}
+└── .env.example
 ```
 
 ## Setup
 
-Requires Python 3.12+. MongoDB Atlas connection string in `.env` (or run a local Mongo separately).
+Requires Python 3.12+.
 
 ```bash
-# 1. Copy env template and fill in keys
 cp .env.example .env
-# Edit .env with real ANTHROPIC_API_KEY, GROQ_API_KEY, MONGODB_URI, etc.
+# Fill ANTHROPIC_API_KEY (required) and ELEVENLABS_API_KEY (for voice)
 
-# 2. One-shot: create venv and install backend deps
-./scripts/setup.sh
-
-# 3. Run backend (dev)
-./scripts/dev.sh
+./scripts/setup.sh         # creates backend/.venv and installs deps
+./scripts/dev.sh           # runs FastAPI on :8000
 ```
 
-The frontend is intentionally empty until tooling is selected.
+OpenAPI docs at `http://localhost:8000/docs`.
 
 ## Architecture in one paragraph
 
-A FastAPI backend orchestrates a customized OASIS social simulation around a user's profile. Agents (manager, friends, family, peers, noise accounts) react to real-world events injected from GDELT. A discrete-event scheduler picks high-salience checkpoints; at each, OASIS runs a full social round and a structured-output LLM extracts a causal-hypothesis ledger. The user can interrupt, edit, and resume at any checkpoint. At target date, the user interviews a voiced future self (ElevenLabs + text) grounded in the full simulation memory. All LLM calls go through a tiered router (Plan B = hosted APIs by default; Plan A = local open-weights on ASUS GX10 if hardware in hand). MongoDB Atlas stores the checkpoint ledger and powers vector search for interview grounding.
+A Vite + React frontend collects a 7-field intake and posts it to a stateless FastAPI backend. `POST /simulate` makes one Claude Opus 4.7 call that returns a full `SimulationData` payload — two precomputed twenty-year trajectories (high = current path, low = alternate work-hours path), each as six `Checkpoint` cards, plus a 25–50 word voiced opening line and three canned future-self replies. The frontend renders this through eight screens (landing → intake → processing → reveal → chat → timeline → slider → encore). `POST /chat` (text) and `POST /chat/voice` (ElevenLabs streaming audio) handle free-form follow-ups in the future-self voice. No database; no live multi-agent simulation; no real-time scheduler. Multi-agent and OASIS-driven simulation are future directions, not part of the MVP.
 
 ## Track strategy (short version)
 
 - Primary general track: **Flicker to Flow**
-- Tier A sponsors: ASUS GX10, ElevenLabs, Gemma
-- Tier B add-ons: Figma Make, GoDaddy, MongoDB Atlas, Cloudinary
-- Optional sponsor: Fetch.ai Agentverse (~100 LOC sidecar, only if core stable)
+- Tier A sponsors: ASUS GX10 (if access granted), ElevenLabs, Gemma
+- Tier B add-ons: Figma Make, GoDaddy, Cloudinary
+- Optional sponsor: Fetch.ai Agentverse (~100 LOC sidecar)
+- Skip: Best Overall (mutually exclusive with general track), MongoDB Atlas (no DB in MVP)
 
 Full reasoning in [`docs/CHAMPION_STRATEGY.md`](docs/CHAMPION_STRATEGY.md).
 
 ## Status
 
-Scaffolded 2026-04-24. Hackathon judging 2026-04-26.
+Scaffolded and backend implemented 2026-04-24. Hackathon judging 2026-04-26.

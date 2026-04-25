@@ -1,0 +1,19 @@
+from pydantic import BaseModel
+
+from app.models.checkpoint import Checkpoint
+from app.models.profile import Profile
+
+
+class SimulationData(BaseModel):
+    """Mirrors frontend `src/types.ts` SimulationData exactly.
+
+    The single object returned by POST /simulate. The frontend stores it and
+    drives all eight screens from this payload.
+    """
+
+    profile: Profile
+    ages: list[int]                              # 5 ages: present, then 4 more
+    checkpointsHigh: list[Checkpoint]            # current-trajectory path (6 cards)
+    checkpointsLow: list[Checkpoint]             # alternate-hours path (6 cards)
+    futureSelfOpening: str                       # 25–50 word voiced reveal line
+    futureSelfReplies: dict[str, str]            # 3 canned Q→A pairs

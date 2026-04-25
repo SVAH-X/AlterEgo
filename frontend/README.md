@@ -47,14 +47,10 @@ The HTML/CSS/JS prototype lives in the design handoff bundle. The CSS was ported
 
 ## API contract (backend)
 
-The backend exposes:
+The backend is stateless and exposes three real endpoints behind a health check:
 
-- `POST /intake` → `{ session_id }`
-- `POST /simulation/start` → `CheckpointCard`
-- `POST /simulation/resume` → `CheckpointCard`
-- `POST /simulation/branch` → `CheckpointCard`
-- `GET  /checkpoints/{id}` → `Checkpoint`
-- `GET  /checkpoints/session/{session_id}` → `Checkpoint[]`
-- `POST /interview` → `InterviewTurn { text, audio_url }`
+- `POST /simulate` — body `Profile`, response `SimulationData` (one Claude call generates both paths + opening voice line + canned replies)
+- `POST /chat` — body `{ profile, history, user_text }`, response `{ text }` (free-form future-self reply)
+- `POST /chat/voice` — same body as `/chat`, response `audio/mpeg` bytes (ElevenLabs streaming TTS)
 
-Pydantic schemas in `backend/app/models/` are the source of truth — mirror them in `src/types.ts` when wiring up real data. Right now `src/data.ts` carries the sample profile and trajectory used by the prototype.
+The `SimulationData` and `Profile` Pydantic models in `backend/app/models/` mirror `src/types.ts` exactly so the JSON crosses the wire untransformed. Wire it in by replacing the hardcoded `AE_DATA` import in `src/App.tsx` with a fetch to `/simulate` after intake completes — keep `AE_DATA` as a fallback for the scripted demo.

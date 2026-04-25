@@ -1,17 +1,37 @@
-"""ElevenLabs wrapper — synthesize voice for the future-self interview.
+"""ElevenLabs streaming TTS for the future-self voice."""
 
-The voice tone is warm, tired, honest. Configurable via ELEVENLABS_VOICE_ID.
-"""
+from collections.abc import AsyncIterator
+
+from elevenlabs.client import AsyncElevenLabs
 
 from app.config import get_settings
 
 
-async def synthesize(text: str) -> bytes:
-    """TODO:
-    - call ElevenLabs streaming TTS
-    - return audio bytes (mp3)
-    """
+class VoiceError(RuntimeError):
+    pass
+
+
+_DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"  # ElevenLabs sample "Bella" — replace via env
+
+
+def _client() -> AsyncElevenLabs:
     settings = get_settings()
     if not settings.elevenlabs_api_key:
-        raise RuntimeError("ELEVENLABS_API_KEY not set")
-    raise NotImplementedError
+        raise VoiceError("ELEVENLABS_API_KEY not set")
+    return AsyncElevenLabs(api_key=settings.elevenlabs_api_key)
+
+
+async def synthesize(text: str) -> AsyncIterator[bytes]:
+    """Yield mp3 audio chunks as they arrive from ElevenLabs."""
+    settings = get_settings()
+    voice_id = settings.elevenlabs_voice_id or _DEFAULT_VOICE_ID
+    client = _client()
+    stream = client.text_to_speech.stream(
+        voice_id=voice_id,
+        text=text,
+        model_id="eleven_turbo_v2_5",
+        output_format="mp3_44100_128",
+    )
+    async for chunk in stream:
+        if chunk:
+            yield chunk
