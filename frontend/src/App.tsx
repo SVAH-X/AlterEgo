@@ -29,6 +29,7 @@ export interface ScreenProps {
   setTimelineViewed: (v: boolean) => void;
   selfieUploaded: boolean;
   setSelfieUploaded: (v: boolean) => void;
+  pushVoiceSample: (blob: Blob) => void;
 }
 
 interface ScreenDef {
@@ -59,6 +60,14 @@ export default function App() {
   // We never store the file itself — just whether the user gave us one.
   // Skipped uploads → blurred placeholder portraits (don't show random stock faces as "you").
   const [selfieUploaded, setSelfieUploaded] = useState(false);
+  // Audio Blobs collected from MicButton during intake. Held in a ref because
+  // nothing in the render path consumes them — they sit here as the "port" for
+  // the future ElevenLabs voice-cloning pipeline (POST the concatenation to
+  // /elevenlabs/clone, persist voice_id on the profile).
+  const voiceSamplesRef = useRef<Blob[]>([]);
+  const pushVoiceSample = (blob: Blob) => {
+    voiceSamplesRef.current.push(blob);
+  };
 
   const go = (i: number) => setIdx(clamp(i, 0, SCREENS.length - 1));
   const next = () => {
@@ -77,6 +86,7 @@ export default function App() {
     setSimulationState(null);
     setTimelineViewed(false);
     setSelfieUploaded(false);
+    voiceSamplesRef.current = [];
     setIdx(0);
   };
   // Wrap setSimulation so a freshly arrived simulation (post-intervention or
@@ -118,6 +128,7 @@ export default function App() {
           setTimelineViewed={setTimelineViewed}
           selfieUploaded={selfieUploaded}
           setSelfieUploaded={setSelfieUploaded}
+          pushVoiceSample={pushVoiceSample}
         />
       </div>
 

@@ -4,6 +4,7 @@ import type { ScreenProps } from "../App";
 import { CornerLabel, Mark, Meta, Portrait, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
 import { simulateStream } from "../lib/api";
+import { MicButton } from "../lib/mic";
 import type { Profile } from "../types";
 import romanStatue from "../assets/roman-half-blur.png";
 import darkClouds from "../assets/dark-grey-clouds-over-the-ocean.jpg";
@@ -222,7 +223,7 @@ const INTAKE_FIELDS: IntakeField[] = [
   },
 ];
 
-export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
+export function ScreenIntake({ onContinue, profile, setProfile, pushVoiceSample }: ScreenProps) {
   const [step, setStep] = useState(0);
   const cur = INTAKE_FIELDS[step];
 
@@ -238,6 +239,33 @@ export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
   const value = isYearsAheadField
     ? Math.max(0, profile.targetYear - profile.presentYear)
     : profile[cur.key];
+
+  // One setter for both keystrokes and live transcripts. Voice input on a
+  // number field arrives chatty ("about thirty two years"), so we extract
+  // the first integer; if no digit shows up yet we hold the previous value
+  // instead of clobbering it with 0.
+  function applyValue(raw: string, source: "type" | "voice") {
+    if (cur.type !== "number") {
+      setProfile({ ...profile, [cur.key]: raw });
+      return;
+    }
+    let n: number;
+    if (source === "voice") {
+      const m = raw.match(/-?\d+/);
+      if (!m) return;
+      n = Number(m[0]);
+    } else {
+      n = Number(raw);
+    }
+    if (isYearsAheadField) {
+      setProfile({
+        ...profile,
+        targetYear: profile.presentYear + (Number.isFinite(n) ? n : 0),
+      });
+    } else {
+      setProfile({ ...profile, [cur.key]: Number.isFinite(n) ? n : 0 });
+    }
+  }
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -287,7 +315,7 @@ export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
               autoFocus
               placeholder={cur.placeholder}
               value={(value as string | undefined) ?? ""}
-              onChange={(e) => setProfile({ ...profile, [cur.key]: e.target.value })}
+              onChange={(e) => applyValue(e.target.value, "type")}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) next();
               }}
@@ -299,26 +327,17 @@ export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
               type={cur.type}
               placeholder={cur.placeholder}
               value={(value as string | number | undefined) ?? ""}
-              onChange={(e) => {
-                if (isYearsAheadField) {
-                  const yrs = Number(e.target.value);
-                  setProfile({
-                    ...profile,
-                    targetYear: profile.presentYear + (Number.isFinite(yrs) ? yrs : 0),
-                  });
-                } else {
-                  setProfile({
-                    ...profile,
-                    [cur.key]:
-                      cur.type === "number" ? Number(e.target.value) : e.target.value,
-                  });
-                }
-              }}
+              onChange={(e) => applyValue(e.target.value, "type")}
               onKeyDown={(e) => {
                 if (e.key === "Enter") next();
               }}
             />
           )}
+
+          <MicButton
+            onTranscript={(text) => applyValue(text, "voice")}
+            onAudioBlob={pushVoiceSample}
+          />
 
           {cur.suffix && (
             <div
