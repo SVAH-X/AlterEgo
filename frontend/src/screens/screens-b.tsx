@@ -286,7 +286,7 @@ export function ScreenChat({ onContinue, profile, simulation, selfieUploaded }: 
             <input
               className="field"
               style={{ borderBottom: "none", fontSize: 20, padding: "8px 0" }}
-              placeholder="Ask her something else…"
+              placeholder="Ask something else…"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
