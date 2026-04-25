@@ -4,6 +4,7 @@ import { clamp } from "./atoms";
 import { AE_DATA } from "./data";
 import { simulateStream } from "./lib/api";
 import type { AgedPortrait, Profile, SimulationData, Trajectory } from "./types";
+import type { Profile, SimulationData } from "./types";
 import {
   ScreenIntake,
   ScreenLanding,
@@ -77,9 +78,22 @@ const SCREENS: ScreenDef[] = [
   { key: "encore", component: ScreenEncore, label: "09 encore" },
 ];
 
+const PRESENT_YEAR = new Date().getFullYear();
+
+const EMPTY_PROFILE: Profile = {
+  name: "",
+  age: 0,
+  occupation: "",
+  workHours: 0,
+  topGoal: "",
+  topFear: "",
+  presentYear: PRESENT_YEAR,
+  targetYear: PRESENT_YEAR,
+};
+
 export default function App() {
   const [idx, setIdx] = useState(0);
-  const [profile, setProfile] = useState<Profile>({ ...AE_DATA.profile });
+  const [profile, setProfile] = useState<Profile>({ ...EMPTY_PROFILE });
   const [simulation, setSimulationState] = useState<SimulationData | null>(null);
   const [selfie, setSelfie] = useState<Blob | null>(null);
   const [timelineViewed, setTimelineViewed] = useState(false);

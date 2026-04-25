@@ -183,6 +183,27 @@ textarea.field {
   line-height: 1.5;
 }
 
+/* Auto-grow textarea: starts as a single line, grows with content. JS keeps
+   the height in sync with scrollHeight, so we hide the scrollbar and let
+   the element size naturally. */
+textarea.field.auto-grow {
+  overflow: hidden;
+  min-height: 1.5em;
+}
+
+/* Hide the native number-input spinner arrows. Inputs in the intake form
+   use type="text" with inputmode="numeric" now, but this guards against
+   any future type="number" usage of .field. */
+.field[type="number"]::-webkit-outer-spin-button,
+.field[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.field[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* slider rail — minimal */
 .rail {
   position: relative;
@@ -365,6 +386,9 @@ input[type="range"].fancy::-moz-range-thumb { width: 12px; height: 12px; border:
 .portrait.dim img { filter: brightness(0.78) contrast(1.08) saturate(0.55) sepia(0.06); }
 .portrait.golden img { filter: brightness(0.96) contrast(1.04) saturate(0.85) sepia(0.12); }
 .portrait.neutral img { filter: brightness(0.92) contrast(1.05) saturate(0.7); }
+
+/* landing CTA — hover nudges the arrow right */
+.landing-cta:hover > div:last-child { transform: translateY(6px); color: var(--accent); }
 
 /* faint horizontal sweep for processing */
 .sweep {
