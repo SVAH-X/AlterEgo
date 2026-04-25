@@ -956,7 +956,7 @@ export function ScreenReveal({ onContinue, profile, simulation, selfieUploaded }
           pointerEvents: streamed.length === opening.length ? "auto" : "none",
         }}
       >
-        ask her something →
+        See how it all unfolds →
       </button>
     </div>
   );
