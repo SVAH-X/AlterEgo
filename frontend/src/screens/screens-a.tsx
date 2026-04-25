@@ -198,9 +198,16 @@ const INTAKE_FIELDS: IntakeField[] = [
   },
 ];
 
+function autoSizeTextarea(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
+
 export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
   const [step, setStep] = useState(0);
   const cur = INTAKE_FIELDS[step];
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   function next() {
     if (step < INTAKE_FIELDS.length - 1) setStep(step + 1);
@@ -214,6 +221,21 @@ export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
   const value = isYearsAheadField
     ? Math.max(0, profile.targetYear - profile.presentYear)
     : profile[cur.key];
+
+  // Number inputs show "" for 0 so the field reads as empty when cleared.
+  // Text inputs show their string verbatim (empty string already renders empty).
+  const displayValue =
+    cur.type === "number"
+      ? value && Number(value) !== 0
+        ? String(value)
+        : ""
+      : ((value as string | undefined) ?? "");
+
+  // Re-measure the textarea when entering a textarea step or when the value
+  // changes (e.g., paste). Auto-resize on input also runs in onChange.
+  useEffect(() => {
+    if (cur.type === "textarea") autoSizeTextarea(textareaRef.current);
+  }, [step, cur.type, displayValue]);
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -258,12 +280,16 @@ export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
           </label>
           {cur.type === "textarea" ? (
             <textarea
-              className="field"
-              rows={2}
+              ref={textareaRef}
+              className="field auto-grow"
+              rows={1}
               autoFocus
               placeholder={cur.placeholder}
-              value={(value as string | undefined) ?? ""}
-              onChange={(e) => setProfile({ ...profile, [cur.key]: e.target.value })}
+              value={displayValue}
+              onChange={(e) => {
+                autoSizeTextarea(e.currentTarget);
+                setProfile({ ...profile, [cur.key]: e.target.value });
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) next();
               }}
@@ -272,22 +298,31 @@ export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
             <input
               className="field"
               autoFocus
-              type={cur.type}
+              type={cur.type === "number" ? "text" : cur.type}
+              inputMode={cur.type === "number" ? "numeric" : undefined}
+              pattern={cur.type === "number" ? "[0-9]*" : undefined}
               placeholder={cur.placeholder}
-              value={(value as string | number | undefined) ?? ""}
+              value={displayValue}
               onChange={(e) => {
-                if (isYearsAheadField) {
-                  const yrs = Number(e.target.value);
-                  setProfile({
-                    ...profile,
-                    targetYear: profile.presentYear + (Number.isFinite(yrs) ? yrs : 0),
-                  });
+                if (cur.type === "number") {
+                  // Strip anything that isn't a digit so users can't paste
+                  // non-numeric content; empty string is allowed (clears field).
+                  const digits = e.target.value.replace(/[^0-9]/g, "");
+                  const n = digits === "" ? 0 : Number(digits);
+                  if (isYearsAheadField) {
+                    setProfile({
+                      ...profile,
+                      targetYear:
+                        profile.presentYear + (Number.isFinite(n) ? n : 0),
+                    });
+                  } else {
+                    setProfile({
+                      ...profile,
+                      [cur.key]: Number.isFinite(n) ? n : 0,
+                    });
+                  }
                 } else {
-                  setProfile({
-                    ...profile,
-                    [cur.key]:
-                      cur.type === "number" ? Number(e.target.value) : e.target.value,
-                  });
+                  setProfile({ ...profile, [cur.key]: e.target.value });
                 }
               }}
               onKeyDown={(e) => {

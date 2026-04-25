@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ComponentType } from "react";
 import { clamp } from "./atoms";
-import { AE_DATA } from "./data";
 import type { Profile, SimulationData } from "./types";
 import {
   ScreenIntake,
@@ -46,9 +45,22 @@ const SCREENS: ScreenDef[] = [
   { key: "encore", component: ScreenEncore, label: "08 encore" },
 ];
 
+const PRESENT_YEAR = new Date().getFullYear();
+
+const EMPTY_PROFILE: Profile = {
+  name: "",
+  age: 0,
+  occupation: "",
+  workHours: 0,
+  topGoal: "",
+  topFear: "",
+  presentYear: PRESENT_YEAR,
+  targetYear: PRESENT_YEAR,
+};
+
 export default function App() {
   const [idx, setIdx] = useState(0);
-  const [profile, setProfile] = useState<Profile>({ ...AE_DATA.profile });
+  const [profile, setProfile] = useState<Profile>({ ...EMPTY_PROFILE });
   const [simulation, setSimulationState] = useState<SimulationData | null>(null);
   // `timelineViewed` flips true when the user advances PAST the timeline screen
   // (i.e., they've already watched the auto-play). On re-entry we skip replay
