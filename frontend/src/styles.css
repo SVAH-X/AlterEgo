@@ -101,26 +101,6 @@ body {
 .btn-accent { border-color: var(--accent-line); color: var(--accent); }
 .btn-accent:hover { border-color: var(--accent); background: var(--accent-soft); }
 
-/* portrait frame — sacred */
-.portrait {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: #0a0908;
-  filter: contrast(1.02) saturate(0.78) brightness(0.92);
-}
-.portrait::after {
-  content: "";
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse at 50% 35%, transparent 40%, rgba(0,0,0,0.55) 100%);
-  pointer-events: none;
-}
-.portrait img {
-  width: 100%; height: 100%; object-fit: cover;
-  display: block;
-}
-
 /* link-style underline reveal */
 .under {
   position: relative;
@@ -460,13 +440,6 @@ input[type="range"].fancy::-webkit-slider-thumb {
 input[type="range"].fancy:active { cursor: grabbing; }
 input[type="range"].fancy::-moz-range-track { height: 1px; background: var(--line); }
 input[type="range"].fancy::-moz-range-thumb { width: 12px; height: 12px; border: none; border-radius: 50%; background: var(--ink); }
-
-/* portrait color treatments by 'mood' */
-.portrait.cool::after { background: radial-gradient(ellipse at 50% 35%, transparent 40%, rgba(8,12,20,0.7) 100%); }
-.portrait.warm::after { background: radial-gradient(ellipse at 50% 35%, transparent 40%, rgba(20,12,6,0.65) 100%); }
-.portrait.dim img { filter: brightness(0.78) contrast(1.08) saturate(0.55) sepia(0.06); }
-.portrait.golden img { filter: brightness(0.96) contrast(1.04) saturate(0.85) sepia(0.12); }
-.portrait.neutral img { filter: brightness(0.92) contrast(1.05) saturate(0.7); }
 
 /* landing CTA — hover nudges the arrow right */
 .landing-cta:hover > div:last-child { transform: translateY(6px); color: var(--accent); }
