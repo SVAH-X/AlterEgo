@@ -22,18 +22,18 @@ alterego/
 
 ## Setup
 
-Requires Python 3.12+, [uv](https://docs.astral.sh/uv/) for backend, and Docker for the local Mongo (optional — Atlas works directly).
+Requires Python 3.12+. MongoDB Atlas connection string in `.env` (or run a local Mongo separately).
 
 ```bash
 # 1. Copy env template and fill in keys
 cp .env.example .env
 # Edit .env with real ANTHROPIC_API_KEY, GROQ_API_KEY, MONGODB_URI, etc.
 
-# 2. Install backend deps
-cd backend && uv sync && cd ..
+# 2. One-shot: create venv and install backend deps
+./scripts/setup.sh
 
 # 3. Run backend (dev)
-cd backend && uv run uvicorn app.main:app --reload --port 8000
+./scripts/dev.sh
 ```
 
 The frontend is intentionally empty until tooling is selected.

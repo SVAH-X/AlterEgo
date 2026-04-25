@@ -5,9 +5,13 @@ FastAPI service. Owns simulation orchestration, the tiered LLM router, OASIS int
 ## Quick start
 
 ```bash
-uv sync                                              # install deps
-uv run uvicorn app.main:app --reload --port 8000     # dev server
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
 ```
+
+Or from the repo root: `./scripts/setup.sh && ./scripts/dev.sh`.
 
 Visit `http://localhost:8000/docs` for the OpenAPI UI.
 

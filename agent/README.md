@@ -10,9 +10,11 @@ Only if pursuing the Fetch.ai Agentverse track. Otherwise skip; the main app doe
 
 ```bash
 cp .env.example .env
-# Fill ANTHROPIC keys, AGENT_SEED, AGENTVERSE_API_KEY, BACKEND_URL
-uv sync
-uv run python alterego_agent.py
+# Fill AGENT_SEED, AGENTVERSE_API_KEY, BACKEND_URL
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python alterego_agent.py
 ```
 
 The agent prints an Agent Inspector URL on startup. Open it, click "Connect" → "Mailbox", then register on Agentverse via the standard registration script.
