@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import type { ScreenProps } from "../App";
+import type { ScreenProps, SimStreamPhase } from "../App";
 import { CornerLabel, Mark, Meta, Portrait, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
-import { simulateStream } from "../lib/api";
+import { nearestPortrait } from "../lib/portraits";
 import type { Profile } from "../types";
 import romanStatue from "../assets/roman-half-blur.png";
 import darkClouds from "../assets/dark-grey-clouds-over-the-ocean.jpg";
@@ -28,6 +29,7 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
   return (
     <div style={{ height: "100%", position: "relative", overflow: "hidden" }}>
       <div className="mark-anchor">
+      <div style={{ position: "absolute", top: 32, left: 32, zIndex: 2 }}>
         <Mark />
       </div>
       <CornerLabel pos="tr">v 0.3 · simulation build</CornerLabel>
@@ -56,6 +58,15 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
           padding: "100px clamp(56px, 6vw, 96px) 140px",
           gap: "clamp(32px, 4vw, 72px)",
           boxSizing: "border-box",
+      {/* Hero grid: oversized stacked wordmark · arched portrait */}
+      <div
+        style={{
+          height: "100%",
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1.25fr) minmax(0, 1fr)",
+          alignItems: "center",
+          padding: "100px clamp(56px, 6vw, 96px) 100px",
+          gap: "clamp(32px, 4vw, 72px)",
           animation: "fade-in 1100ms var(--ease) 200ms both",
         }}
       >
@@ -109,6 +120,48 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
             <br />
             <span style={{ color: "var(--accent)" }}>see where your life is heading</span>
           </div>
+          <button
+            onClick={onContinue}
+            aria-label="Begin — see where your life is heading"
+            className="landing-cta"
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              color: "var(--ink-1)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 14,
+              animation: "fade-in 900ms var(--ease) 1300ms both",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 11,
+                letterSpacing: "0.22em",
+                textTransform: "uppercase",
+                lineHeight: 1.7,
+                textAlign: "center",
+              }}
+            >
+              See where your
+              <br />
+              life is heading.
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--serif)",
+                fontSize: 22,
+                color: "var(--accent)",
+                transition: "transform 500ms var(--ease)",
+              }}
+            >
+              ↓
+            </div>
+          </button>
         </div>
 
         <div
@@ -186,6 +239,20 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
           animation: "fade-in 900ms var(--ease) 1900ms both",
         }}
       >
+      {/* Runtime caption — pinned bottom */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 32,
+          right: 40,
+          fontFamily: "var(--mono)",
+          fontSize: 10,
+          letterSpacing: "0.22em",
+          textTransform: "uppercase",
+          color: "var(--ink-3)",
+          animation: "fade-in 900ms var(--ease) 1900ms both",
+        }}
+      >
         ~ 8 min · honest, not motivational
       </div>
     </div>
@@ -222,9 +289,16 @@ const INTAKE_FIELDS: IntakeField[] = [
   },
 ];
 
+function autoSizeTextarea(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
+
 export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
   const [step, setStep] = useState(0);
   const cur = INTAKE_FIELDS[step];
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   function next() {
     if (step < INTAKE_FIELDS.length - 1) setStep(step + 1);
@@ -238,6 +312,21 @@ export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
   const value = isYearsAheadField
     ? Math.max(0, profile.targetYear - profile.presentYear)
     : profile[cur.key];
+
+  // Number inputs show "" for 0 so the field reads as empty when cleared.
+  // Text inputs show their string verbatim (empty string already renders empty).
+  const displayValue =
+    cur.type === "number"
+      ? value && Number(value) !== 0
+        ? String(value)
+        : ""
+      : ((value as string | undefined) ?? "");
+
+  // Re-measure the textarea when entering a textarea step or when the value
+  // changes (e.g., paste). Auto-resize on input also runs in onChange.
+  useEffect(() => {
+    if (cur.type === "textarea") autoSizeTextarea(textareaRef.current);
+  }, [step, cur.type, displayValue]);
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -282,12 +371,16 @@ export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
           </label>
           {cur.type === "textarea" ? (
             <textarea
-              className="field"
-              rows={2}
+              ref={textareaRef}
+              className="field auto-grow"
+              rows={1}
               autoFocus
               placeholder={cur.placeholder}
-              value={(value as string | undefined) ?? ""}
-              onChange={(e) => setProfile({ ...profile, [cur.key]: e.target.value })}
+              value={displayValue}
+              onChange={(e) => {
+                autoSizeTextarea(e.currentTarget);
+                setProfile({ ...profile, [cur.key]: e.target.value });
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) next();
               }}
@@ -296,22 +389,31 @@ export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
             <input
               className="field"
               autoFocus
-              type={cur.type}
+              type={cur.type === "number" ? "text" : cur.type}
+              inputMode={cur.type === "number" ? "numeric" : undefined}
+              pattern={cur.type === "number" ? "[0-9]*" : undefined}
               placeholder={cur.placeholder}
-              value={(value as string | number | undefined) ?? ""}
+              value={displayValue}
               onChange={(e) => {
-                if (isYearsAheadField) {
-                  const yrs = Number(e.target.value);
-                  setProfile({
-                    ...profile,
-                    targetYear: profile.presentYear + (Number.isFinite(yrs) ? yrs : 0),
-                  });
+                if (cur.type === "number") {
+                  // Strip anything that isn't a digit so users can't paste
+                  // non-numeric content; empty string is allowed (clears field).
+                  const digits = e.target.value.replace(/[^0-9]/g, "");
+                  const n = digits === "" ? 0 : Number(digits);
+                  if (isYearsAheadField) {
+                    setProfile({
+                      ...profile,
+                      targetYear:
+                        profile.presentYear + (Number.isFinite(n) ? n : 0),
+                    });
+                  } else {
+                    setProfile({
+                      ...profile,
+                      [cur.key]: Number.isFinite(n) ? n : 0,
+                    });
+                  }
                 } else {
-                  setProfile({
-                    ...profile,
-                    [cur.key]:
-                      cur.type === "number" ? Number(e.target.value) : e.target.value,
-                  });
+                  setProfile({ ...profile, [cur.key]: e.target.value });
                 }
               }}
               onKeyDown={(e) => {
@@ -377,18 +479,8 @@ export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
   );
 }
 
-type Phase = "counting" | "plan" | "events" | "finalizing" | "complete" | "error";
-
-interface FilledOutline {
-  year: number;
-  severity: number;
-  hint: string;
-  filled: boolean;       // becomes true once detail-fill lands
-  pulse: number;         // monotonic counter to retrigger the pulse animation
-  title?: string;
-}
-
-const PHASE_LABELS: Record<Phase, string> = {
+const PHASE_LABELS: Record<SimStreamPhase, string> = {
+  idle: "waiting to begin",
   counting: "drafting the people in your life",
   plan: "laying out the years",
   events: "writing the moments",
@@ -400,15 +492,16 @@ const PHASE_LABELS: Record<Phase, string> = {
 export function ScreenProcessing({
   onContinue,
   profile,
-  setSimulation,
+  simStreamPhase,
+  agentCount,
+  outline,
+  latestTitle,
+  errorMessage,
+  portraitsDone,
+  runSimulate,
 }: ScreenProps) {
-  const [phase, setPhase] = useState<Phase>("counting");
-  const [agentCount, setAgentCount] = useState(0);
-  const [outline, setOutline] = useState<FilledOutline[]>([]);
-  const [latestTitle, setLatestTitle] = useState<string>("");
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [usedFallback, setUsedFallback] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const mountedAtRef = useRef(Date.now());
 
   const startYear = profile.presentYear || 2026;
   const endYear = profile.targetYear || 2046;
@@ -422,9 +515,25 @@ export function ScreenProcessing({
     return () => clearInterval(id);
   }, []);
 
+  // Kick off the simulation on mount; runSimulate has its own guard against
+  // double-fire so re-mounts (e.g. devnav) are safe.
+  useEffect(() => {
+    runSimulate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-advance once the stream is complete, with a minimum display time.
+  useEffect(() => {
+    if (simStreamPhase !== "complete") return;
+    const elapsed = Date.now() - mountedAtRef.current;
+    const wait = Math.max(1200, 5000 - elapsed);
+    const t = setTimeout(() => onContinue(), wait);
+    return () => clearTimeout(t);
+  }, [simStreamPhase]);
+
   // The leading edge advances by whichever is further along: a steady
   // time-based estimate, or the latest event that's actually landed.
-  // Both are capped below 1.0 — only `phase === "complete"` allows 100%,
+  // Both are capped below 1.0 — only `simStreamPhase === "complete"` allows 100%,
   // so the user never sees the bar look "done" while finalize is still running.
   const ESTIMATED_TOTAL_MS = 70_000;
   const RUN_CAP = 0.85;       // ceiling during counting/plan/events
@@ -443,7 +552,7 @@ export function ScreenProcessing({
   // During the finalize phase (after all events have landed) the bar continues
   // to crawl forward to FINAL_CAP so the screen doesn't appear stuck.
   const finalizingStartRef = useRef<number | null>(null);
-  if (phase === "finalizing" && finalizingStartRef.current === null) {
+  if (simStreamPhase === "finalizing" && finalizingStartRef.current === null) {
     finalizingStartRef.current = Date.now();
   }
   const finalizeElapsed =
@@ -452,98 +561,15 @@ export function ScreenProcessing({
       : 0;
   const FINALIZE_EXPECTED_MS = 18_000;
   const finalizeFrac =
-    phase === "finalizing"
+    simStreamPhase === "finalizing"
       ? RUN_CAP +
       Math.min(1, finalizeElapsed / FINALIZE_EXPECTED_MS) * (FINAL_CAP - RUN_CAP)
       : 0;
 
   const markerFrac =
-    phase === "complete"
+    simStreamPhase === "complete"
       ? 1
       : Math.max(timeFrac, eventFrac, finalizeFrac);
-
-  useEffect(() => {
-    let cancelled = false;
-    let advanceTimer: ReturnType<typeof setTimeout> | undefined;
-
-    (async () => {
-      const startedAt = Date.now();
-      const MIN_MS = 5000;
-      try {
-        for await (const ev of simulateStream(profile)) {
-          if (cancelled) return;
-          if (ev.phase === "counting") {
-            setAgentCount(ev.agents.length);
-            setPhase("plan"); // counting done — moving on to planning
-          } else if (ev.phase === "plan") {
-            setOutline(
-              ev.outline.map((o) => ({
-                year: o.year,
-                severity: o.severity,
-                hint: o.hint,
-                filled: false,
-                pulse: 0,
-              })),
-            );
-            setPhase("events");
-          } else if (ev.phase === "event") {
-            const cp = ev.checkpoint;
-            setOutline((prev) => {
-              const next = prev.map((o) => ({ ...o }));
-              const idx =
-                ev.index >= 0 && ev.index < next.length
-                  ? ev.index
-                  : next.findIndex((o) => o.year === cp.year && !o.filled);
-              if (idx >= 0 && idx < next.length) {
-                next[idx] = {
-                  ...next[idx],
-                  filled: true,
-                  pulse: next[idx].pulse + 1,
-                  title: cp.title,
-                };
-              }
-              return next;
-            });
-            setLatestTitle(cp.title);
-          } else if (ev.phase === "finalizing") {
-            setPhase("finalizing");
-            setLatestTitle("weaving the threads — the alternate path, the voice");
-          } else if (ev.phase === "complete") {
-            setSimulation(ev.simulation);
-            setPhase("complete");
-          } else if (ev.phase === "error") {
-            console.error("simulate stream error:", ev.message);
-            setErrorMsg(ev.message);
-            setUsedFallback(true);
-            setSimulation(null);
-            setPhase("error");
-          }
-        }
-      } catch (e) {
-        if (cancelled) return;
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error("stream failed:", msg);
-        setErrorMsg(msg);
-        setUsedFallback(true);
-        setSimulation(null);
-        setPhase("error");
-      }
-      if (cancelled) return;
-      const elapsed = Date.now() - startedAt;
-      const remaining = Math.max(0, MIN_MS - elapsed);
-      // Hold just enough for the 900ms fill animation to play, plus a brief
-      // beat. The user can also click "meet her →" to advance immediately.
-      advanceTimer = setTimeout(() => {
-        if (!cancelled) onContinue();
-      }, Math.max(remaining, 1200));
-    })();
-
-    return () => {
-      cancelled = true;
-      if (advanceTimer) clearTimeout(advanceTimer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const filledCount = outline.filter((o) => o.filled).length;
   const totalEvents = outline.length;
@@ -564,7 +590,7 @@ export function ScreenProcessing({
         <Mark />
       </div>
       <CornerLabel pos="tr">
-        simulating · {phase === "complete" ? "ready" : "do not refresh"}
+        simulating · {simStreamPhase === "complete" ? "ready" : "do not refresh"}
       </CornerLabel>
 
       <svg
@@ -601,15 +627,15 @@ export function ScreenProcessing({
           marginBottom: 60,
         }}
       >
-        <Meta style={{ marginBottom: 24, color: phase === "error" ? "var(--warn)" : undefined }}>
-          {PHASE_LABELS[phase]}
-          {phase === "events" && totalEvents > 0
+        <Meta style={{ marginBottom: 24, color: simStreamPhase === "error" ? "var(--warn)" : undefined }}>
+          {PHASE_LABELS[simStreamPhase]}
+          {simStreamPhase === "events" && totalEvents > 0
             ? ` · ${filledCount} / ${totalEvents}`
             : ""}
-          {phase === "counting" && agentCount > 0 ? ` · ${agentCount} people` : ""}
+          {simStreamPhase === "counting" && agentCount > 0 ? ` · ${agentCount} people` : ""}
         </Meta>
         <div
-          key={latestTitle || phase}
+          key={latestTitle || simStreamPhase}
           className="serif"
           style={{
             fontSize: "clamp(26px, 3.4vw, 40px)",
@@ -621,7 +647,7 @@ export function ScreenProcessing({
             animation: "fade-in-slow 1400ms var(--ease) both",
           }}
         >
-          {latestTitle || (phase === "error" ? "Falling back to a sample." : "…")}
+          {latestTitle || (simStreamPhase === "error" ? "Falling back to a sample." : "…")}
         </div>
       </div>
 
@@ -671,7 +697,7 @@ export function ScreenProcessing({
               background: "var(--accent)",
               borderRadius: 4,
               transition:
-                phase === "complete"
+                simStreamPhase === "complete"
                   ? "width 900ms cubic-bezier(0.22, 0.61, 0.36, 1)"
                   : "width 360ms cubic-bezier(0.22, 0.61, 0.36, 1)",
               boxShadow: "0 0 10px rgba(212, 165, 116, 0.35)",
@@ -719,10 +745,10 @@ export function ScreenProcessing({
                 "0 0 10px 3px rgba(212, 165, 116, 0.6), 0 0 22px 8px rgba(212, 165, 116, 0.18)",
               filter: "blur(0.5px)",
               transition:
-                phase === "complete"
+                simStreamPhase === "complete"
                   ? "left 900ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 600ms ease-out 700ms"
                   : "left 360ms cubic-bezier(0.22, 0.61, 0.36, 1)",
-              opacity: phase === "complete" ? 0 : 0.95,
+              opacity: simStreamPhase === "complete" ? 0 : 0.95,
             }}
           />
         </div>
@@ -755,6 +781,14 @@ export function ScreenProcessing({
           maxWidth: 600,
         }}
       >
+        {simStreamPhase === "error"
+          ? `${errorMessage?.slice(0, 80) ?? "stream interrupted"} · using sample`
+          : `${totalEvents > 0 ? totalEvents : "—"} events · ${agentCount > 0 ? agentCount : "—"} people`}
+        {portraitsDone > 0 && (
+          <div className="muted" style={{ fontSize: 12, fontFamily: "var(--mono)", marginTop: 8 }}>
+            rendering portraits · {portraitsDone} / 10
+          </div>
+        )}
         {phase === "error"
           ? `${errorMsg?.slice(0, 80) ?? "stream interrupted"} · using sample`
           : usedFallback
@@ -762,7 +796,7 @@ export function ScreenProcessing({
             : `${totalEvents > 0 ? totalEvents : "—"} events · ${agentCount > 0 ? agentCount : "—"} people`}
       </div>
 
-      {(phase === "complete" || phase === "error") && (
+      {(simStreamPhase === "complete" || simStreamPhase === "error") && (
         <button
           className="under"
           onClick={onContinue}
@@ -855,6 +889,19 @@ export function ScreenReveal({ onContinue, profile, simulation, selfieUploaded }
             }}
           >
             <Portrait age={olderAge} mood="dim" blurred={!selfieUploaded} />
+            {(() => {
+              const p = nearestPortrait(simulation?.agedPortraits, "high", profile.targetYear);
+              if (p?.imageUrl) {
+                return (
+                  <img
+                    src={p.imageUrl}
+                    alt={`you at ${p.age}`}
+                    style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
+                  />
+                );
+              }
+              return <Portrait age={olderAge} mood="dim" />;
+            })()}
           </div>
 
           <div
