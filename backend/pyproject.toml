@@ -1,0 +1,34 @@
+[project]
+name = "alterego-backend"
+version = "0.1.0"
+description = "AlterEgo FastAPI backend — OASIS-grounded personal future simulation"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "python-dotenv>=1.0",
+    "httpx>=0.27",
+    "anthropic>=0.40",
+    "groq>=0.13",
+    "openai>=1.55",
+    "motor>=3.6",
+    "elevenlabs>=1.10",
+    "replicate>=1.0",
+    "cloudinary>=1.41",
+    "camel-oasis",
+    "python-multipart>=0.0.12",
+    "structlog>=24.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.7",
+    "mypy>=1.13",
+]
+
+[tool.uv]
+package = false

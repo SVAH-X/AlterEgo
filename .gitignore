@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+
+# Node
+node_modules/
+.next/
+.turbo/
+.pnpm-debug.log*
+npm-debug.log*
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# macOS
+.DS_Store
+
+# Hackathon scratch
+scratch/
+*.local.md
+
+# Build artifacts
+trained_models/
+*.bin
+*.gguf
+*.safetensors
+
+# Legacy — archived locally for reference only; not tracked
+legacy/
