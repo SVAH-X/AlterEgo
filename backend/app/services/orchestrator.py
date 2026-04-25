@@ -16,7 +16,7 @@ from typing import Optional
 from pydantic import ValidationError
 
 from app.config import get_settings
-from app.models import Checkpoint, Profile, SimulationData
+from app.models import AgedPortrait, Checkpoint, Profile, SimulationData
 from app.models.orchestration import AgentSpec, OutlineEvent
 from app.prompts.orchestration import (
     ALTERNATE_SYSTEM,
@@ -211,6 +211,8 @@ async def stream_branched_simulation(
     profile: Profile,
     intervention: dict,
     original_simulation: SimulationData,
+    selfie_bytes: bytes | None = None,
+    selfie_mime: str = "image/jpeg",
 ) -> AsyncIterator[dict]:
     """Re-stream the trajectory after the user's intervention.
 
@@ -284,6 +286,15 @@ async def stream_branched_simulation(
             futureSelfReplies=final_payload["futureSelfReplies"],
         )
         yield {"phase": "complete", "simulation": sim.model_dump()}
+        # AMENDMENT A4: silent skip on missing key (same as stream_simulation)
+        if selfie_bytes and settings.gemini_api_key:
+            async for ev in _fan_out_portraits_branched(
+                profile=profile, selfie_bytes=selfie_bytes, selfie_mime=selfie_mime,
+                high=completed, low=alternate_cps, ages=_compute_ages(profile),
+                intervention=intervention,
+                original_portraits=original_simulation.agedPortraits,
+            ):
+                yield ev
 
     except OrchestrationError as e:
         yield {"phase": "error", "message": str(e)}
@@ -500,6 +511,81 @@ async def _fan_out_portraits(
     tasks = []
     for i, age in enumerate(ages):
         tasks.append(asyncio.create_task(_one(i, age, "high", high)))
+        tasks.append(asyncio.create_task(_one(i, age, "low", low)))
+
+    for coro in asyncio.as_completed(tasks):
+        yield await coro
+
+
+async def _fan_out_portraits_branched(
+    *,
+    profile: Profile,
+    selfie_bytes: bytes,
+    selfie_mime: str,
+    high: list[Checkpoint],
+    low: list[Checkpoint],
+    ages: list[int],
+    intervention: dict,
+    original_portraits: list[AgedPortrait],
+) -> AsyncIterator[dict]:
+    """Branched-mode portrait fan-out.
+
+    - High portraits with year < intervention['year'] are preserved verbatim
+      from `original_portraits` and re-emitted with their original index.
+    - High portraits with year >= intervention['year'] are regenerated.
+    - All low portraits are regenerated (the alternate trajectory is rebuilt
+      whole by the existing `_alternate()` step on every branch)."""
+    iv_year = int(intervention["year"])
+    span = profile.targetYear - profile.presentYear
+
+    def _events_up_to(cps: list[Checkpoint], year: int) -> list[Checkpoint]:
+        return [c for c in cps if c.year <= year]
+
+    # Lookup table for preserved high portraits (year -> portrait).
+    by_year_high = {p.year: p for p in original_portraits if p.trajectory == "high"}
+
+    preserved_indices: set[int] = set()
+    for i, _age in enumerate(ages):
+        year = profile.presentYear + round(span * (i / 4))
+        if year < iv_year and year in by_year_high:
+            yield {
+                "phase": "portrait",
+                "trajectory": "high",
+                "index": i,
+                "portrait": by_year_high[year].model_dump(),
+            }
+            preserved_indices.add(i)
+
+    async def _one(index: int, age: int, trajectory: str, source: list[Checkpoint]) -> dict:
+        year = profile.presentYear + round(span * (index / 4))
+        portrait = await generate_aged_portrait(
+            selfie_bytes=selfie_bytes,
+            selfie_mime=selfie_mime,
+            profile=profile,
+            target_age=age,
+            target_year=year,
+            trajectory=trajectory,  # type: ignore[arg-type]
+            relevant_events=_events_up_to(source, year),
+        )
+        if portrait.imageUrl is None:
+            return {
+                "phase": "portrait_error",
+                "trajectory": trajectory,
+                "index": index,
+                "message": "image generation failed",
+            }
+        return {
+            "phase": "portrait",
+            "trajectory": trajectory,
+            "index": index,
+            "portrait": portrait.model_dump(),
+        }
+
+    tasks = []
+    for i, age in enumerate(ages):
+        if i not in preserved_indices:
+            tasks.append(asyncio.create_task(_one(i, age, "high", high)))
+        # Low always regenerates.
         tasks.append(asyncio.create_task(_one(i, age, "low", low)))
 
     for coro in asyncio.as_completed(tasks):

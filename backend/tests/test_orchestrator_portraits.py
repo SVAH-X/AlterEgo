@@ -65,3 +65,53 @@ async def test_fan_out_portraits_emits_portrait_error_on_null_url() -> None:
 
     error_events = [e for e in events if e["phase"] == "portrait_error"]
     assert len(error_events) == 10  # all failed -> all error events
+
+
+from app.services.orchestrator import _fan_out_portraits_branched
+
+
+@pytest.mark.asyncio
+async def test_branched_portrait_fanout_preserves_pre_intervention_high() -> None:
+    """High portraits with year < intervention.year are re-emitted verbatim
+    from the original simulation; high portraits at/after the intervention
+    year are regenerated; all 5 low portraits are regenerated."""
+    profile = _profile()
+    ages = [32, 37, 42, 47, 52]
+    span = profile.targetYear - profile.presentYear  # 20
+
+    original_high = [
+        AgedPortrait(
+            age=a, year=profile.presentYear + round(span * (i / 4)),
+            trajectory="high", imageUrl=f"data:image/png;base64,ORIGINAL-{i}",
+        )
+        for i, a in enumerate(ages)
+    ]
+
+    intervention = {"year": 2036, "text": "I quit"}  # cuts at index 2 (age 42)
+
+    async def fake_gen(*, target_age, target_year, trajectory, **_kwargs):
+        return AgedPortrait(
+            age=target_age, year=target_year, trajectory=trajectory,
+            imageUrl=f"data:image/png;base64,REGEN-{trajectory}-{target_age}",
+        )
+
+    with patch("app.services.orchestrator.generate_aged_portrait", new=AsyncMock(side_effect=fake_gen)):
+        events = []
+        async for ev in _fan_out_portraits_branched(
+            profile=profile, selfie_bytes=b"x", selfie_mime="image/jpeg",
+            high=_cps(), low=_cps(), ages=ages,
+            intervention=intervention,
+            original_portraits=original_high,
+        ):
+            events.append(ev)
+
+    high_events = [e for e in events if e["phase"] == "portrait" and e["trajectory"] == "high"]
+    low_events = [e for e in events if e["phase"] == "portrait" and e["trajectory"] == "low"]
+    assert len(high_events) == 5
+    assert len(low_events) == 5
+    # Indices 0 and 1 (years 2026, 2031) are pre-intervention -> preserved.
+    preserved = [e for e in high_events if e["index"] in (0, 1)]
+    assert all("ORIGINAL" in e["portrait"]["imageUrl"] for e in preserved)
+    # Indices 2,3,4 are at/after intervention.year -> regenerated.
+    regen = [e for e in high_events if e["index"] in (2, 3, 4)]
+    assert all("REGEN" in e["portrait"]["imageUrl"] for e in regen)
