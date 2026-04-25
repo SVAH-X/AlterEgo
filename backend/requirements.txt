@@ -8,6 +8,7 @@ anthropic>=0.40
 groq>=0.13
 openai>=1.55
 elevenlabs>=1.10
+google-genai>=0.3
 
 # dev
 pytest>=8.3
