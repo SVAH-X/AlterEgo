@@ -33,6 +33,7 @@ from app.prompts.orchestration import (
 )
 from app.routing import AgentRouter, Tier, get_router
 from app.services.event_pool import filter_pool, format_pool_for_prompt
+from app.services.image_generator import generate_aged_portrait
 from app.services.state_model import State, initial_state
 
 DETAIL_BATCH_SIZE = 4
@@ -50,6 +51,8 @@ class OrchestrationError(RuntimeError):
 
 async def stream_simulation(
     profile: Profile,
+    selfie_bytes: bytes | None = None,
+    selfie_mime: str = "image/jpeg",
     intervention: Optional[dict] = None,
 ) -> AsyncIterator[dict]:
     """Stream a simulation. If `intervention` is provided (shape:
@@ -93,6 +96,7 @@ async def stream_simulation(
         alternate_task = asyncio.create_task(_alternate(profile, completed, router))
         final_payload, alternate_cps = await asyncio.gather(finalize_task, alternate_task)
 
+        ages = _compute_ages(profile)
         sim = SimulationData(
             profile=profile,
             agedPortraits=[],
@@ -102,6 +106,14 @@ async def stream_simulation(
             futureSelfReplies=final_payload["futureSelfReplies"],
         )
         yield {"phase": "complete", "simulation": sim.model_dump()}
+        # AMENDMENT A4: short-circuit on missing API key (silent skip per spec)
+        settings_local = get_settings()
+        if selfie_bytes and settings_local.gemini_api_key:
+            async for ev in _fan_out_portraits(
+                profile=profile, selfie_bytes=selfie_bytes, selfie_mime=selfie_mime,
+                high=completed, low=alternate_cps, ages=ages,
+            ):
+                yield ev
 
     except OrchestrationError as e:
         yield {"phase": "error", "message": str(e)}
@@ -439,6 +451,60 @@ def _correct_age(cp: Checkpoint, profile: Profile) -> Checkpoint:
     if cp.age == correct:
         return cp
     return cp.model_copy(update={"age": correct})
+
+
+# ---------------------------------------------------------------------------
+# Portrait fan-out
+
+async def _fan_out_portraits(
+    *,
+    profile: Profile,
+    selfie_bytes: bytes,
+    selfie_mime: str,
+    high: list[Checkpoint],
+    low: list[Checkpoint],
+    ages: list[int],
+) -> AsyncIterator[dict]:
+    """Fire one Gemini call per (trajectory, anchor) — 10 total — and yield
+    each result as it lands. Failures are emitted as 'portrait_error' events.
+    Successes are emitted as 'portrait' events with the AgedPortrait inline."""
+    span = profile.targetYear - profile.presentYear
+
+    def _events_up_to(cps: list[Checkpoint], year: int) -> list[Checkpoint]:
+        return [c for c in cps if c.year <= year]
+
+    async def _one(index: int, age: int, trajectory: str, source: list[Checkpoint]) -> dict:
+        year = profile.presentYear + round(span * (index / 4))
+        portrait = await generate_aged_portrait(
+            selfie_bytes=selfie_bytes,
+            selfie_mime=selfie_mime,
+            profile=profile,
+            target_age=age,
+            target_year=year,
+            trajectory=trajectory,  # type: ignore[arg-type]
+            relevant_events=_events_up_to(source, year),
+        )
+        if portrait.imageUrl is None:
+            return {
+                "phase": "portrait_error",
+                "trajectory": trajectory,
+                "index": index,
+                "message": "image generation failed",
+            }
+        return {
+            "phase": "portrait",
+            "trajectory": trajectory,
+            "index": index,
+            "portrait": portrait.model_dump(),
+        }
+
+    tasks = []
+    for i, age in enumerate(ages):
+        tasks.append(asyncio.create_task(_one(i, age, "high", high)))
+        tasks.append(asyncio.create_task(_one(i, age, "low", low)))
+
+    for coro in asyncio.as_completed(tasks):
+        yield await coro
 
 
 # ---------------------------------------------------------------------------
