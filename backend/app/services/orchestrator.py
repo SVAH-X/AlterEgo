@@ -466,6 +466,9 @@ def _correct_age(cp: Checkpoint, profile: Profile) -> Checkpoint:
 # ---------------------------------------------------------------------------
 # Portrait fan-out
 
+PORTRAIT_CONCURRENCY = 3  # Gemini image gen rate-limits aggressively per minute
+
+
 async def _fan_out_portraits(
     *,
     profile: Profile,
@@ -477,23 +480,26 @@ async def _fan_out_portraits(
 ) -> AsyncIterator[dict]:
     """Fire one Gemini call per (trajectory, anchor) — 10 total — and yield
     each result as it lands. Failures are emitted as 'portrait_error' events.
-    Successes are emitted as 'portrait' events with the AgedPortrait inline."""
+    Successes are emitted as 'portrait' events with the AgedPortrait inline.
+    Concurrency is capped via PORTRAIT_CONCURRENCY to avoid per-minute 429s."""
     span = profile.targetYear - profile.presentYear
+    sem = asyncio.Semaphore(PORTRAIT_CONCURRENCY)
 
     def _events_up_to(cps: list[Checkpoint], year: int) -> list[Checkpoint]:
         return [c for c in cps if c.year <= year]
 
     async def _one(index: int, age: int, trajectory: str, source: list[Checkpoint]) -> dict:
         year = profile.presentYear + round(span * (index / 4))
-        portrait = await generate_aged_portrait(
-            selfie_bytes=selfie_bytes,
-            selfie_mime=selfie_mime,
-            profile=profile,
-            target_age=age,
-            target_year=year,
-            trajectory=trajectory,  # type: ignore[arg-type]
-            relevant_events=_events_up_to(source, year),
-        )
+        async with sem:
+            portrait = await generate_aged_portrait(
+                selfie_bytes=selfie_bytes,
+                selfie_mime=selfie_mime,
+                profile=profile,
+                target_age=age,
+                target_year=year,
+                trajectory=trajectory,  # type: ignore[arg-type]
+                relevant_events=_events_up_to(source, year),
+            )
         if portrait.imageUrl is None:
             return {
                 "phase": "portrait_error",
@@ -543,6 +549,7 @@ async def _fan_out_portraits_branched(
 
     # Lookup table for preserved high portraits (year -> portrait).
     by_year_high = {p.year: p for p in original_portraits if p.trajectory == "high"}
+    sem = asyncio.Semaphore(PORTRAIT_CONCURRENCY)
 
     preserved_indices: set[int] = set()
     for i, _age in enumerate(ages):
@@ -558,15 +565,16 @@ async def _fan_out_portraits_branched(
 
     async def _one(index: int, age: int, trajectory: str, source: list[Checkpoint]) -> dict:
         year = profile.presentYear + round(span * (index / 4))
-        portrait = await generate_aged_portrait(
-            selfie_bytes=selfie_bytes,
-            selfie_mime=selfie_mime,
-            profile=profile,
-            target_age=age,
-            target_year=year,
-            trajectory=trajectory,  # type: ignore[arg-type]
-            relevant_events=_events_up_to(source, year),
-        )
+        async with sem:
+            portrait = await generate_aged_portrait(
+                selfie_bytes=selfie_bytes,
+                selfie_mime=selfie_mime,
+                profile=profile,
+                target_age=age,
+                target_year=year,
+                trajectory=trajectory,  # type: ignore[arg-type]
+                relevant_events=_events_up_to(source, year),
+            )
         if portrait.imageUrl is None:
             return {
                 "phase": "portrait_error",

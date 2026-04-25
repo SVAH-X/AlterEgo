@@ -8,6 +8,7 @@ the failure as a `portrait_error` phase and continue with the rest.
 import asyncio
 import base64
 import logging
+import re
 from typing import Any
 
 from app.config import get_settings
@@ -15,6 +16,11 @@ from app.models import AgedPortrait, Checkpoint, Profile, Trajectory
 from app.prompts.portrait import render_portrait_prompt
 
 logger = logging.getLogger(__name__)
+
+# Retry budget for transient 429s — Gemini image gen has strict per-minute limits.
+RATE_LIMIT_RETRIES = 1
+RATE_LIMIT_DEFAULT_DELAY_SECONDS = 12.0
+_RETRY_DELAY_PATTERN = re.compile(r"retry in ([0-9]+(?:\.[0-9]+)?)s", re.IGNORECASE)
 
 
 async def generate_aged_portrait(
@@ -63,7 +69,10 @@ async def generate_aged_portrait(
 
 
 async def _call_gemini(prompt: str, selfie_bytes: bytes, selfie_mime: str) -> Any:
-    """Thin wrapper around the google-genai SDK. Patched in tests."""
+    """Thin wrapper around the google-genai SDK. Patched in tests.
+
+    Retries once on 429 RESOURCE_EXHAUSTED, honoring the server's suggested
+    retryDelay when present (parsed from the error message)."""
     from google import genai
     from google.genai import types
 
@@ -73,15 +82,42 @@ async def _call_gemini(prompt: str, selfie_bytes: bytes, selfie_mime: str) -> An
 
     client = genai.Client(api_key=settings.gemini_api_key)
 
-    # google-genai is sync; offload to a thread to keep the event loop free.
-    return await asyncio.to_thread(
-        client.models.generate_content,
-        model=settings.gemini_image_model,
-        contents=[
-            types.Part.from_bytes(data=selfie_bytes, mime_type=selfie_mime),
-            prompt,
-        ],
-    )
+    last_exc: Exception | None = None
+    for attempt in range(RATE_LIMIT_RETRIES + 1):
+        try:
+            # google-genai is sync; offload to a thread to keep the event loop free.
+            return await asyncio.to_thread(
+                client.models.generate_content,
+                model=settings.gemini_image_model,
+                contents=[
+                    types.Part.from_bytes(data=selfie_bytes, mime_type=selfie_mime),
+                    prompt,
+                ],
+            )
+        except Exception as e:  # noqa: BLE001 — caller handles all failures
+            last_exc = e
+            if attempt >= RATE_LIMIT_RETRIES or not _is_rate_limited(e):
+                raise
+            delay = _retry_delay_seconds(e)
+            logger.info("portrait gen rate-limited, retrying in %.1fs", delay)
+            await asyncio.sleep(delay)
+    # Unreachable, but satisfies type-checker about the function always returning or raising.
+    raise last_exc if last_exc else RuntimeError("portrait gen retry loop exited unexpectedly")
+
+
+def _is_rate_limited(e: Exception) -> bool:
+    msg = str(e)
+    return "429" in msg or "RESOURCE_EXHAUSTED" in msg
+
+
+def _retry_delay_seconds(e: Exception) -> float:
+    m = _RETRY_DELAY_PATTERN.search(str(e))
+    if m:
+        try:
+            return min(60.0, float(m.group(1)))  # cap at 60s so we don't hang forever
+        except ValueError:
+            pass
+    return RATE_LIMIT_DEFAULT_DELAY_SECONDS
 
 
 def _extract_image(response: Any) -> tuple[bytes | None, str]:
