@@ -366,6 +366,9 @@ input[type="range"].fancy::-moz-range-thumb { width: 12px; height: 12px; border:
 .portrait.golden img { filter: brightness(0.96) contrast(1.04) saturate(0.85) sepia(0.12); }
 .portrait.neutral img { filter: brightness(0.92) contrast(1.05) saturate(0.7); }
 
+/* landing CTA — hover nudges the arrow right */
+.landing-cta:hover > div:last-child { transform: translateY(6px); color: var(--accent); }
+
 /* faint horizontal sweep for processing */
 .sweep {
   position: absolute; left: 0; right: 0; height: 1px;
