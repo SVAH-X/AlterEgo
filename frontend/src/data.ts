@@ -13,7 +13,18 @@ export const AE_DATA: SimulationData = {
     presentYear: 2026,
   },
 
-  ages: [32, 38, 45, 52, 56],
+  agedPortraits: [
+    { age: 32, year: 2026, trajectory: "high", imageUrl: null },
+    { age: 37, year: 2031, trajectory: "high", imageUrl: null },
+    { age: 42, year: 2036, trajectory: "high", imageUrl: null },
+    { age: 47, year: 2041, trajectory: "high", imageUrl: null },
+    { age: 52, year: 2046, trajectory: "high", imageUrl: null },
+    { age: 32, year: 2026, trajectory: "low", imageUrl: null },
+    { age: 37, year: 2031, trajectory: "low", imageUrl: null },
+    { age: 42, year: 2036, trajectory: "low", imageUrl: null },
+    { age: 47, year: 2041, trajectory: "low", imageUrl: null },
+    { age: 52, year: 2046, trajectory: "low", imageUrl: null },
+  ],
 
   checkpointsHigh: [
     {
