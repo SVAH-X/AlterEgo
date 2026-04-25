@@ -328,6 +328,7 @@ export function ScreenTimeline({
   timelineViewed,
   setTimelineViewed,
   selfie,
+  mergePortrait,
 }: ScreenProps) {
   const checkpoints = simulation?.checkpointsHigh ?? AE_DATA.checkpointsHigh;
   const startYear = profile.presentYear || 2026;
@@ -486,7 +487,10 @@ export function ScreenTimeline({
         } else if (ev.phase === "finalizing") {
           setRewriting((r) => (r ? { ...r, phase: "stitching it together" } : null));
         } else if (ev.phase === "complete") {
-          setSimulation(ev.simulation);
+          // Reset agedPortraits to [] in the freshly-completed simulation;
+          // post-complete portrait events below will fill them in via
+          // mergePortrait, mirroring the App-level runSimulate flow.
+          setSimulation({ ...ev.simulation, agedPortraits: [] });
           setRewriting(null);
           // Drop the user at the end of the new trajectory, no replay — they
           // just watched it materialize. They can scrub or intervene again.
@@ -494,7 +498,10 @@ export function ScreenTimeline({
           setT(1);
           setAutoplay(false);
           setTimelineViewed(true);
-          break;
+          // Don't break — keep iterating so post-complete portrait events
+          // are merged into the new simulation.
+        } else if (ev.phase === "portrait") {
+          mergePortrait(ev.portrait);
         } else if (ev.phase === "error") {
           console.error("branch error:", ev.message);
           break;

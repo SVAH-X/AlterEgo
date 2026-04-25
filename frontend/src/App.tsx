@@ -142,6 +142,11 @@ export default function App() {
       return;
     }
     streamingRef.current = true;
+    // Token guards against a restart-mid-stream race: if the user hits
+    // restart while events are in flight, restart() flips streamingRef to
+    // false; subsequent events from the orphaned IIFE see streamingRef !==
+    // true and break out instead of writing stale state.
+    const myRunIsAlive = () => streamingRef.current;
     // Reset processing state so a re-run starts fresh.
     setSimStreamPhase("counting");
     setAgentCount(0);
@@ -152,9 +157,10 @@ export default function App() {
     (async () => {
       try {
         for await (const ev of simulateStream(profile, selfie)) {
+          if (!myRunIsAlive()) break;
           if (ev.phase === "counting") {
             setAgentCount(ev.agents.length);
-            setSimStreamPhase("plan"); // counting done — moving on to planning
+            setSimStreamPhase("counting");
           } else if (ev.phase === "plan") {
             setOutline(
               ev.outline.map((o) => ({
@@ -165,7 +171,7 @@ export default function App() {
                 pulse: 0,
               })),
             );
-            setSimStreamPhase("events");
+            setSimStreamPhase("plan");
           } else if (ev.phase === "event") {
             const cp = ev.checkpoint;
             setOutline((prev) => {
@@ -185,6 +191,7 @@ export default function App() {
               return next;
             });
             setLatestTitle(cp.title);
+            setSimStreamPhase("events");
           } else if (ev.phase === "finalizing") {
             setSimStreamPhase("finalizing");
             setLatestTitle("weaving the threads — the alternate path, the voice");

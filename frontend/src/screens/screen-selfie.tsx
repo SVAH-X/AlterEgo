@@ -186,7 +186,6 @@ export function ScreenSelfie({ onContinue, onBack, selfie, setSelfie }: ScreenPr
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              capture="user"
               style={{ display: "none" }}
               onChange={onFileChosen}
             />
