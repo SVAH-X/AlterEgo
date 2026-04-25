@@ -496,7 +496,7 @@ export function ScreenTimeline({
       setTimelineViewed(true);
     }
     try {
-      for await (const ev of simulateBranchStream(profile, cp.year, trimmed, originalSim, selfie!)) {
+      for await (const ev of simulateBranchStream(profile, cp.year, trimmed, originalSim, selfie)) {
         if (ev.phase === "counting") {
           setRewriting((r) =>
             r ? { ...r, phase: "redrafting the people in your life" } : null,

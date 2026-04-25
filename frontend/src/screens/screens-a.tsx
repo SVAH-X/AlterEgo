@@ -11,10 +11,11 @@ import { useTTSPlayer } from "../voice/useTTSPlayer";
 import { MicButton } from "../voice/MicButton";
 import { cloneVoice } from "../lib/voice";
 
-export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
+export function ScreenLanding({ onContinue, onJumpTo, setSelfieUploaded, setSelfie }: ScreenProps) {
   function skip() {
     setSelfieUploaded(false);
-    onContinue();
+    setSelfie(null);
+    onJumpTo("intake");
   }
 
   return (

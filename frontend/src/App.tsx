@@ -201,11 +201,6 @@ export default function App() {
   // continue arriving after the user advances past Processing.
   const runSimulate = () => {
     if (streamingRef.current) return; // guard against double-start
-    if (!selfie) {
-      setErrorMessage("Selfie required before simulate");
-      setSimStreamPhase("error");
-      return;
-    }
     streamingRef.current = true;
     // Token guards against a restart-mid-stream race: if the user hits
     // restart while events are in flight, restart() flips streamingRef to
