@@ -27,7 +27,7 @@ interface ChatMessage {
   done: boolean;
 }
 
-export function ScreenChat({ onContinue, profile, simulation }: ScreenProps) {
+export function ScreenChat({ onContinue, profile, simulation, selfieUploaded }: ScreenProps) {
   const olderAge =
     (Number(profile.age) || 32) +
     ((Number(profile.targetYear) - Number(profile.presentYear)) || 20);
@@ -115,7 +115,7 @@ export function ScreenChat({ onContinue, profile, simulation }: ScreenProps) {
         position: "relative",
       }}
     >
-      <div style={{ position: "absolute", top: 32, left: 32, zIndex: 5 }}>
+      <div className="mark-anchor">
         <Mark />
       </div>
       <CornerLabel pos="tr">interview · {profile.targetYear || 2046}</CornerLabel>
@@ -131,7 +131,7 @@ export function ScreenChat({ onContinue, profile, simulation }: ScreenProps) {
         }}
       >
         <div style={{ width: "100%", height: 420, flexShrink: 0, maxWidth: 320 }}>
-          <Portrait age={olderAge} mood="dim" />
+          <Portrait age={olderAge} mood="dim" blurred={!selfieUploaded} />
         </div>
         <div style={{ textAlign: "center" }}>
           <div
@@ -314,6 +314,7 @@ export function ScreenTimeline({
   setSimulation,
   timelineViewed,
   setTimelineViewed,
+  selfieUploaded,
 }: ScreenProps) {
   const checkpoints = simulation?.checkpointsHigh ?? AE_DATA.checkpointsHigh;
   const startYear = profile.presentYear || 2026;
@@ -505,7 +506,7 @@ export function ScreenTimeline({
         overflow: "hidden",
       }}
     >
-      <div style={{ position: "absolute", top: 32, left: 32, zIndex: 5 }}>
+      <div className="mark-anchor">
         <Mark />
       </div>
       <CornerLabel pos="tr">
@@ -567,7 +568,7 @@ export function ScreenTimeline({
             transition: "filter 600ms var(--ease)",
           }}
         >
-          <Portrait age={currentAge} mood={mood} fadeKey={pickPortraitAge(currentAge)} />
+          <Portrait age={currentAge} mood={mood} fadeKey={pickPortraitAge(currentAge)} blurred={!selfieUploaded} />
         </div>
         <div style={{ textAlign: "center" }}>
           <div
@@ -1050,6 +1051,7 @@ export function ScreenSlider({
   profile,
   simulation,
   setTimelineViewed,
+  selfieUploaded,
 }: ScreenProps) {
   // Reaching the slider always counts as having seen the timeline. Going back
   // from here should drop the user straight into intervention mode (all events
@@ -1085,7 +1087,7 @@ export function ScreenSlider({
         overflow: "hidden",
       }}
     >
-      <div style={{ position: "absolute", top: 32, left: 32, zIndex: 5 }}>
+      <div className="mark-anchor">
         <Mark />
       </div>
       <CornerLabel pos="tr">re-simulate · one variable</CornerLabel>
@@ -1110,7 +1112,7 @@ export function ScreenSlider({
             transition: "filter 700ms var(--ease)",
           }}
         >
-          <Portrait age={finalAge} mood={mood} fadeKey={isLow ? "low" : "high"} />
+          <Portrait age={finalAge} mood={mood} fadeKey={isLow ? "low" : "high"} blurred={!selfieUploaded} />
         </div>
         <div style={{ textAlign: "center", transition: "color 600ms var(--ease)" }}>
           <Meta style={{ marginBottom: 8, color: isLow ? "var(--accent)" : "var(--ink-3)" }}>
@@ -1256,7 +1258,7 @@ export function ScreenSlider({
   );
 }
 
-export function ScreenEncore({ onRestart, profile, simulation }: ScreenProps) {
+export function ScreenEncore({ onRestart, profile, simulation, selfieUploaded }: ScreenProps) {
   const baseAge = profile.age || 32;
   const finalAge = baseAge + ((profile.targetYear || 2046) - (profile.presentYear || 2026));
   const highCps = simulation?.checkpointsHigh ?? AE_DATA.checkpointsHigh;
@@ -1276,7 +1278,7 @@ export function ScreenEncore({ onRestart, profile, simulation }: ScreenProps) {
         padding: "80px 60px 60px",
       }}
     >
-      <div style={{ position: "absolute", top: 32, left: 32 }}>
+      <div className="mark-anchor">
         <Mark />
       </div>
       <CornerLabel pos="tr">two futures · {profile.targetYear || 2046}</CornerLabel>
@@ -1326,6 +1328,7 @@ export function ScreenEncore({ onRestart, profile, simulation }: ScreenProps) {
           cp={high}
           accent={false}
           fadeKey="enc-high"
+          blurred={!selfieUploaded}
         />
         <div style={{ background: "var(--line-soft)" }} />
         <FutureColumn
@@ -1335,6 +1338,7 @@ export function ScreenEncore({ onRestart, profile, simulation }: ScreenProps) {
           cp={low}
           accent
           fadeKey="enc-low"
+          blurred={!selfieUploaded}
         />
       </div>
 
@@ -1376,6 +1380,7 @@ function FutureColumn({
   cp,
   accent,
   fadeKey,
+  blurred,
 }: {
   label: string;
   portraitMood: PortraitMood;
@@ -1383,6 +1388,7 @@ function FutureColumn({
   cp: Checkpoint;
   accent: boolean;
   fadeKey: string;
+  blurred: boolean;
 }) {
   return (
     <div
@@ -1396,7 +1402,7 @@ function FutureColumn({
         {label}
       </Meta>
       <div style={{ width: "100%", height: "min(50vh, 460px)", flexShrink: 0, marginBottom: 24 }}>
-        <Portrait age={age} mood={portraitMood} fadeKey={fadeKey} />
+        <Portrait age={age} mood={portraitMood} fadeKey={fadeKey} blurred={blurred} />
       </div>
       <h3
         className="serif"

@@ -27,6 +27,8 @@ export interface ScreenProps {
   setSimulation: (s: SimulationData | null) => void;
   timelineViewed: boolean;
   setTimelineViewed: (v: boolean) => void;
+  selfieUploaded: boolean;
+  setSelfieUploaded: (v: boolean) => void;
 }
 
 interface ScreenDef {
@@ -54,6 +56,9 @@ export default function App() {
   // (i.e., they've already watched the auto-play). On re-entry we skip replay
   // and drop them at t=1 so they can directly intervene.
   const [timelineViewed, setTimelineViewed] = useState(false);
+  // We never store the file itself — just whether the user gave us one.
+  // Skipped uploads → blurred placeholder portraits (don't show random stock faces as "you").
+  const [selfieUploaded, setSelfieUploaded] = useState(false);
 
   const go = (i: number) => setIdx(clamp(i, 0, SCREENS.length - 1));
   const next = () => {
@@ -71,6 +76,7 @@ export default function App() {
   const restart = () => {
     setSimulationState(null);
     setTimelineViewed(false);
+    setSelfieUploaded(false);
     setIdx(0);
   };
   // Wrap setSimulation so a freshly arrived simulation (post-intervention or
@@ -110,6 +116,8 @@ export default function App() {
           setSimulation={setSimulation}
           timelineViewed={timelineViewed}
           setTimelineViewed={setTimelineViewed}
+          selfieUploaded={selfieUploaded}
+          setSelfieUploaded={setSelfieUploaded}
         />
       </div>
 
