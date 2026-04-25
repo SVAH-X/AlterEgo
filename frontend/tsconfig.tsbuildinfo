@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/atoms.tsx","./src/data.ts","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/lib/api.ts","./src/screens/screens-a.tsx","./src/screens/screens-b.tsx"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/atoms.tsx","./src/data.ts","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/lib/api.ts","./src/lib/portraits.ts","./src/screens/screen-selfie.tsx","./src/screens/screens-a.tsx","./src/screens/screens-b.tsx"],"version":"5.9.3"}

@@ -1,4 +1,5 @@
 export type Tone = "neutral" | "warn" | "good";
+export type Trajectory = "high" | "low";
 
 export interface Profile {
   name: string;
@@ -21,9 +22,16 @@ export interface Checkpoint {
   tone: Tone;
 }
 
+export interface AgedPortrait {
+  age: number;
+  year: number;
+  trajectory: Trajectory;
+  imageUrl: string | null;
+}
+
 export interface SimulationData {
   profile: Profile;
-  ages: number[];
+  agedPortraits: AgedPortrait[];
   checkpointsHigh: Checkpoint[];
   checkpointsLow: Checkpoint[];
   futureSelfOpening: string;
@@ -53,5 +61,7 @@ export type StreamEvent =
   | { phase: "plan"; outline: OutlineEvent[] }
   | { phase: "event"; index: number; checkpoint: Checkpoint }
   | { phase: "finalizing" }
+  | { phase: "portrait"; trajectory: Trajectory; index: number; portrait: AgedPortrait }
+  | { phase: "portrait_error"; trajectory: Trajectory; index: number; message: string }
   | { phase: "complete"; simulation: SimulationData }
   | { phase: "error"; message: string };

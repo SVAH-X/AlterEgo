@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     elevenlabs_voice_id: str = ""
 
+    # Gemini (image generation for aged portraits)
+    # Absent api_key ⇒ portraits are silently skipped (agedPortraits=[]); the
+    # rest of /simulate works unchanged.
+    gemini_api_key: str = ""
+    gemini_image_model: str = "gemini-2.5-flash-image"
+
     # Server
     backend_port: int = 8000
     frontend_url: str = "http://localhost:3000"
