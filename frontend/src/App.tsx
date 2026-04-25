@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { ComponentType } from "react";
 import { clamp } from "./atoms";
-import { AE_DATA } from "./data";
 import { simulateStream } from "./lib/api";
 import type { AgedPortrait, Profile, SimulationData, Trajectory } from "./types";
-import type { Profile, SimulationData } from "./types";
 import {
   ScreenIntake,
   ScreenLanding,

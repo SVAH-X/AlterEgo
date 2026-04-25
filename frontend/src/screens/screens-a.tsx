@@ -698,11 +698,6 @@ export function ScreenProcessing({
             rendering portraits · {portraitsDone} / 10
           </div>
         )}
-        {phase === "error"
-          ? `${errorMsg?.slice(0, 80) ?? "stream interrupted"} · using sample`
-          : usedFallback
-            ? "showing a sample · your version is still cooking"
-            : `${totalEvents > 0 ? totalEvents : "—"} events · ${agentCount > 0 ? agentCount : "—"} people`}
       </div>
 
       {(simStreamPhase === "complete" || simStreamPhase === "error") && (
