@@ -95,7 +95,7 @@ async def stream_simulation(
 
         sim = SimulationData(
             profile=profile,
-            ages=_compute_ages(profile),
+            agedPortraits=[],
             checkpointsHigh=completed,
             checkpointsLow=alternate_cps,
             futureSelfOpening=final_payload["futureSelfOpening"],
@@ -266,7 +266,7 @@ async def stream_branched_simulation(
 
         sim = SimulationData(
             profile=profile,
-            ages=_compute_ages(profile),
+            agedPortraits=[],
             checkpointsHigh=completed,
             checkpointsLow=alternate_cps,
             futureSelfOpening=final_payload["futureSelfOpening"],

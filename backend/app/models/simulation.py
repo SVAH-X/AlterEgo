@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
 from app.models.checkpoint import Checkpoint
+from app.models.portrait import AgedPortrait
 from app.models.profile import Profile
 
 
@@ -12,7 +13,7 @@ class SimulationData(BaseModel):
     """
 
     profile: Profile
-    ages: list[int]                              # 5 ages: present, then 4 more
+    agedPortraits: list[AgedPortrait]            # 10 entries: 5 high + 5 low
     checkpointsHigh: list[Checkpoint]            # current-trajectory path (6 cards)
     checkpointsLow: list[Checkpoint]             # alternate-hours path (6 cards)
     futureSelfOpening: str                       # 25–50 word voiced reveal line
