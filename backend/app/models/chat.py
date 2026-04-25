@@ -22,6 +22,7 @@ class ChatRequest(BaseModel):
     simulation: SimulationData
     history: list[ChatMessage]
     user_text: str
+    voice_id: str | None = None  # optional cloned voice for /chat/voice playback
 
 
 class ChatResponse(BaseModel):

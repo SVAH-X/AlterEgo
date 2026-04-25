@@ -16,6 +16,9 @@ import {
   ScreenTimeline,
 } from "./screens/screens-b";
 import { ScreenSelfie } from "./screens/screen-selfie";
+import { VoiceModeToggle } from "./voice/VoiceModeToggle";
+import { useVoice } from "./voice/VoiceContext";
+import { deleteVoice } from "./lib/voice";
 
 export type SimStreamPhase =
   | "idle"
@@ -164,6 +167,9 @@ export default function App() {
     };
   }, []);
   const restart = () => {
+    if (clonedVoiceId) deleteVoice(clonedVoiceId);
+    setClonedVoiceId(null);
+    clearIntakeSamples();
     setSimulationState(null);
     setTimelineViewed(false);
     setSelfieUploaded(false);
@@ -343,6 +349,8 @@ export default function App() {
       <div key={SCREENS[idx].key} className="screen entering">
         <Active {...screenProps} />
       </div>
+
+      <VoiceModeToggle />
 
       <div className="devnav">
         {SCREENS.map((s, i) => (

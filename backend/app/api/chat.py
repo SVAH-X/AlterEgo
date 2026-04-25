@@ -27,7 +27,7 @@ async def chat_voice(req: ChatRequest) -> StreamingResponse:
         raise HTTPException(status_code=502, detail=str(e))
 
     try:
-        audio_iter = synthesize(text)
+        audio_iter = synthesize(text, voice_id=req.voice_id)
     except VoiceError as e:
         raise HTTPException(status_code=502, detail=str(e))
 

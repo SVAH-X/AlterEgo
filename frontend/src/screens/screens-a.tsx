@@ -7,6 +7,10 @@ import { nearestPortrait } from "../lib/portraits";
 import type { Profile } from "../types";
 import romanStatue from "../assets/roman-half-blur.png";
 import darkClouds from "../assets/dark-grey-clouds-over-the-ocean.jpg";
+import { useVoice, useVoicePrimed } from "../voice/VoiceContext";
+import { useTTSPlayer } from "../voice/useTTSPlayer";
+import { MicButton } from "../voice/MicButton";
+import { cloneVoice } from "../lib/voice";
 
 export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
   function skip() {
@@ -214,8 +218,42 @@ export function ScreenIntake({ onContinue, profile, setProfile, pushVoiceSample 
   const [step, setStep] = useState(0);
   const cur = INTAKE_FIELDS[step];
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const { voiceMode, pushIntakeSample, pushIntakeSeconds } = useVoice();
+  const voicePrimed = useVoicePrimed();
+  const tts = useTTSPlayer();
+
+  // Auto-play the current question when entering voice mode.
+  useEffect(() => {
+    if (voiceMode && voicePrimed) tts.play(cur.label);
+    else tts.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, voiceMode, voicePrimed]);
+
+  function applyTranscript(text: string) {
+    if (cur.type === "number") {
+      const digits = text.replace(/[^0-9]/g, "");
+      if (!digits) return;
+      const n = Number(digits);
+      if (cur.key === "targetYear") {
+        setProfile({ ...profile, targetYear: profile.presentYear + n });
+      } else {
+        setProfile({ ...profile, [cur.key]: n });
+      }
+    } else {
+      setProfile({ ...profile, [cur.key]: text });
+    }
+  }
+
+  function onRecorded(blob: Blob, durationMs: number) {
+    // Open-ended fields make the best cloning samples.
+    if (cur.type === "textarea" || cur.type === "text") {
+      pushIntakeSample(blob);
+      pushIntakeSeconds(durationMs / 1000);
+    }
+  }
 
   function next() {
+    tts.stop();
     if (step < INTAKE_FIELDS.length - 1) setStep(step + 1);
     else onContinue();
   }
@@ -431,6 +469,26 @@ export function ScreenProcessing({
 }: ScreenProps) {
   const [elapsedMs, setElapsedMs] = useState(0);
   const mountedAtRef = useRef(Date.now());
+  const { intakeSamples, intakeSamplesSeconds, setClonedVoiceId } = useVoice();
+
+  // Voice cloning runs in parallel with /simulate. Skip if no samples or
+  // the audio is too short to produce a usable clone (~5s minimum).
+  useEffect(() => {
+    if (intakeSamples.length === 0 || intakeSamplesSeconds < 5) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const id = await cloneVoice(intakeSamples, `alterego-${Date.now()}`);
+        if (!cancelled) setClonedVoiceId(id);
+      } catch (e) {
+        console.warn("voice clone failed:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startYear = profile.presentYear || 2026;
   const endYear = profile.targetYear || 2046;
@@ -742,6 +800,9 @@ type RevealPhase = 0 | 1 | 2 | 3;
 
 export function ScreenReveal({ onContinue, profile, simulation, selfieUploaded }: ScreenProps) {
   const [phase, setPhase] = useState<RevealPhase>(0);
+  const { voiceMode, clonedVoiceId } = useVoice();
+  const voicePrimed = useVoicePrimed();
+  const tts = useTTSPlayer();
   useEffect(() => {
     const t1 = setTimeout(() => setPhase(1), 900);
     const t2 = setTimeout(() => setPhase(2), 3400);
@@ -753,6 +814,15 @@ export function ScreenReveal({ onContinue, profile, simulation, selfieUploaded }
 
   const opening = simulation?.futureSelfOpening ?? AE_DATA.futureSelfOpening;
   const streamed = useStreamedText(opening, 24, phase >= 3);
+
+  // Auto-play the opening in the cloned voice (if available) when phase 3 hits.
+  useEffect(() => {
+    if (phase >= 3 && voiceMode && voicePrimed) {
+      tts.play(opening, clonedVoiceId ?? undefined);
+    }
+    return () => tts.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, voiceMode, voicePrimed, opening, clonedVoiceId]);
 
   const olderAge =
     (Number(profile.age) || 32) +
