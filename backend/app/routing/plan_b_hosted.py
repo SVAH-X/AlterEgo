@@ -39,6 +39,8 @@ class HostedBackend:
         temperature: float,
     ) -> str:
         # TODO: enable prompt caching on `system` once character cards stabilize.
+        # Newer Anthropic models (Opus 4.7+) reject `temperature` as deprecated;
+        # use the default sampling and ignore the caller's hint.
         anthropic_tier = tier if tier != Tier.NOISE else Tier.PEERS
         model = self._anthropic_models[anthropic_tier]
         resp = await self._anthropic.messages.create(
@@ -46,7 +48,6 @@ class HostedBackend:
             system=system,
             messages=messages,
             max_tokens=max_tokens,
-            temperature=temperature,
         )
         return "".join(block.text for block in resp.content if block.type == "text")
 

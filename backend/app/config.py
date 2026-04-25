@@ -1,4 +1,5 @@
 from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,7 +10,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Inference plan
+    # Inference plan: B = hosted APIs (default), A = local on ASUS GX10
     inference_plan: str = "B"
 
     # Anthropic (Plan B)
@@ -18,11 +19,11 @@ class Settings(BaseSettings):
     anthropic_model_high_signal: str = "claude-sonnet-4-6"
     anthropic_model_peers: str = "claude-haiku-4-5"
 
-    # Groq (Plan B noise)
+    # Groq (Plan B noise tier; not used by the MVP path but kept for the router)
     groq_api_key: str = ""
     groq_model_noise: str = "llama-3.1-8b-instant"
 
-    # GX10 (Plan A)
+    # GX10 (Plan A — only if hardware in hand; specific models TBD after bringup)
     gx10_base_url: str = "http://localhost:8001/v1"
     gx10_api_key: str = "local-no-key"
     gx10_model_future_self: str = ""
@@ -30,31 +31,9 @@ class Settings(BaseSettings):
     gx10_model_peers: str = ""
     gx10_model_noise: str = ""
 
-    # ElevenLabs
+    # ElevenLabs (voiced future-self interview)
     elevenlabs_api_key: str = ""
     elevenlabs_voice_id: str = ""
-
-    # Mongo
-    mongodb_uri: str = "mongodb://localhost:27017"
-    mongodb_db: str = "alterego"
-
-    # Cloudinary
-    cloudinary_cloud_name: str = ""
-    cloudinary_api_key: str = ""
-    cloudinary_api_secret: str = ""
-
-    # Replicate
-    replicate_api_token: str = ""
-
-    # Ready Player Me
-    ready_player_me_subdomain: str = ""
-
-    # GDELT
-    gdelt_api_base: str = "https://api.gdeltproject.org/api/v2"
-
-    # Agentverse (optional)
-    agentverse_api_key: str = ""
-    agent_seed: str = ""
 
     # Server
     backend_port: int = 8000
