@@ -28,6 +28,7 @@ interface PortraitProps {
   className?: string;
   style?: CSSProperties;
   fadeKey?: string | number;
+  blurred?: boolean;
 }
 
 export function Portrait({
@@ -36,6 +37,7 @@ export function Portrait({
   className = "",
   style,
   fadeKey,
+  blurred = false,
 }: PortraitProps) {
   const portraitAge = pickPortraitAge(age);
   const src = PORTRAITS[portraitAge];
@@ -70,6 +72,9 @@ export function Portrait({
           position: "absolute",
           inset: 0,
           animation: "fade-in-slow 900ms var(--ease) both",
+          // Blur when no selfie was uploaded — don't show a random stock face as "you".
+          filter: blurred ? "blur(28px) saturate(0.7)" : undefined,
+          transform: blurred ? "scale(1.08)" : undefined,
         }}
         onError={(e) => {
           (e.target as HTMLImageElement).style.display = "none";

@@ -28,7 +28,7 @@ interface ChatMessage {
   done: boolean;
 }
 
-export function ScreenChat({ onContinue, profile, simulation }: ScreenProps) {
+export function ScreenChat({ onContinue, profile, simulation, selfieUploaded }: ScreenProps) {
   const olderAge =
     (Number(profile.age) || 32) +
     ((Number(profile.targetYear) - Number(profile.presentYear)) || 20);
@@ -116,7 +116,7 @@ export function ScreenChat({ onContinue, profile, simulation }: ScreenProps) {
         position: "relative",
       }}
     >
-      <div style={{ position: "absolute", top: 32, left: 32, zIndex: 5 }}>
+      <div className="mark-anchor">
         <Mark />
       </div>
       <CornerLabel pos="tr">interview · {profile.targetYear || 2046}</CornerLabel>
@@ -132,6 +132,7 @@ export function ScreenChat({ onContinue, profile, simulation }: ScreenProps) {
         }}
       >
         <div style={{ width: "100%", height: 420, flexShrink: 0, maxWidth: 320 }}>
+          <Portrait age={olderAge} mood="dim" blurred={!selfieUploaded} />
           {(() => {
             const p = nearestPortrait(simulation?.agedPortraits, "high", profile.targetYear);
             if (p?.imageUrl) {
@@ -327,6 +328,7 @@ export function ScreenTimeline({
   setSimulation,
   timelineViewed,
   setTimelineViewed,
+  selfieUploaded,
   selfie,
   mergePortrait,
 }: ScreenProps) {
@@ -526,7 +528,7 @@ export function ScreenTimeline({
         overflow: "hidden",
       }}
     >
-      <div style={{ position: "absolute", top: 32, left: 32, zIndex: 5 }}>
+      <div className="mark-anchor">
         <Mark />
       </div>
       <CornerLabel pos="tr">
@@ -588,6 +590,7 @@ export function ScreenTimeline({
             transition: "filter 600ms var(--ease)",
           }}
         >
+          <Portrait age={currentAge} mood={mood} fadeKey={pickPortraitAge(currentAge)} blurred={!selfieUploaded} />
           {(() => {
             const p = nearestPortrait(simulation?.agedPortraits, "high", currentYear);
             if (p?.imageUrl) {
@@ -1088,6 +1091,7 @@ export function ScreenSlider({
   profile,
   simulation,
   setTimelineViewed,
+  selfieUploaded,
 }: ScreenProps) {
   // Reaching the slider always counts as having seen the timeline. Going back
   // from here should drop the user straight into intervention mode (all events
@@ -1123,7 +1127,7 @@ export function ScreenSlider({
         overflow: "hidden",
       }}
     >
-      <div style={{ position: "absolute", top: 32, left: 32, zIndex: 5 }}>
+      <div className="mark-anchor">
         <Mark />
       </div>
       <CornerLabel pos="tr">re-simulate · one variable</CornerLabel>
@@ -1148,6 +1152,7 @@ export function ScreenSlider({
             transition: "filter 700ms var(--ease)",
           }}
         >
+          <Portrait age={finalAge} mood={mood} fadeKey={isLow ? "low" : "high"} blurred={!selfieUploaded} />
           {(() => {
             const p = nearestPortrait(simulation?.agedPortraits, isLow ? "low" : "high", endYear);
             if (p?.imageUrl) {
@@ -1312,7 +1317,7 @@ export function ScreenSlider({
   );
 }
 
-export function ScreenEncore({ onRestart, profile, simulation }: ScreenProps) {
+export function ScreenEncore({ onRestart, profile, simulation, selfieUploaded }: ScreenProps) {
   const baseAge = profile.age || 32;
   const endYear = profile.targetYear || 2046;
   const finalAge = baseAge + (endYear - (profile.presentYear || 2026));
@@ -1334,7 +1339,7 @@ export function ScreenEncore({ onRestart, profile, simulation }: ScreenProps) {
         padding: "80px 60px 60px",
       }}
     >
-      <div style={{ position: "absolute", top: 32, left: 32 }}>
+      <div className="mark-anchor">
         <Mark />
       </div>
       <CornerLabel pos="tr">two futures · {profile.targetYear || 2046}</CornerLabel>
@@ -1384,6 +1389,7 @@ export function ScreenEncore({ onRestart, profile, simulation }: ScreenProps) {
           cp={high}
           accent={false}
           fadeKey="enc-high"
+          blurred={!selfieUploaded}
           portraits={portraits}
           trajectory="high"
           endYear={endYear}
@@ -1396,6 +1402,7 @@ export function ScreenEncore({ onRestart, profile, simulation }: ScreenProps) {
           cp={low}
           accent
           fadeKey="enc-low"
+          blurred={!selfieUploaded}
           portraits={portraits}
           trajectory="low"
           endYear={endYear}
@@ -1440,6 +1447,7 @@ function FutureColumn({
   cp,
   accent,
   fadeKey,
+  blurred,
   portraits,
   trajectory,
   endYear,
@@ -1450,6 +1458,7 @@ function FutureColumn({
   cp: Checkpoint;
   accent: boolean;
   fadeKey: string;
+  blurred: boolean;
   portraits?: AgedPortrait[];
   trajectory: Trajectory;
   endYear: number;
@@ -1466,6 +1475,7 @@ function FutureColumn({
         {label}
       </Meta>
       <div style={{ width: "100%", height: "min(50vh, 460px)", flexShrink: 0, marginBottom: 24 }}>
+        <Portrait age={age} mood={portraitMood} fadeKey={fadeKey} blurred={blurred} />
         {(() => {
           const p = nearestPortrait(portraits, trajectory, endYear);
           if (p?.imageUrl) {

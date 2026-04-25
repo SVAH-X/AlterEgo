@@ -46,6 +46,8 @@ export interface ScreenProps {
   setSimulation: (s: SimulationData | null) => void;
   timelineViewed: boolean;
   setTimelineViewed: (v: boolean) => void;
+  selfieUploaded: boolean;
+  setSelfieUploaded: (v: boolean) => void;
   selfie: Blob | null;
   setSelfie: (s: Blob | null) => void;
   simStreamPhase: SimStreamPhase;
@@ -95,6 +97,9 @@ export default function App() {
   const [simulation, setSimulationState] = useState<SimulationData | null>(null);
   const [selfie, setSelfie] = useState<Blob | null>(null);
   const [timelineViewed, setTimelineViewed] = useState(false);
+  // We never store the file itself — just whether the user gave us one.
+  // Skipped uploads → blurred placeholder portraits (don't show random stock faces as "you").
+  const [selfieUploaded, setSelfieUploaded] = useState(false);
   const [simStreamPhase, setSimStreamPhase] = useState<SimStreamPhase>("idle");
   const [agentCount, setAgentCount] = useState(0);
   const [outline, setOutline] = useState<FilledOutline[]>([]);
@@ -120,6 +125,7 @@ export default function App() {
   const restart = () => {
     setSimulationState(null);
     setTimelineViewed(false);
+    setSelfieUploaded(false);
     setSelfie(null);
     setSimStreamPhase("idle");
     setAgentCount(0);
@@ -259,6 +265,8 @@ export default function App() {
           setSimulation={setSimulation}
           timelineViewed={timelineViewed}
           setTimelineViewed={setTimelineViewed}
+          selfieUploaded={selfieUploaded}
+          setSelfieUploaded={setSelfieUploaded}
           selfie={selfie}
           setSelfie={setSelfie}
           simStreamPhase={simStreamPhase}
