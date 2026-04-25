@@ -514,9 +514,16 @@ async def _fan_out_portraits(
             "portrait": portrait.model_dump(),
         }
 
+    # The hero portrait — final-year, high trajectory — is the one Reveal/Chat
+    # show as "you in twenty years." Fire it solo and yield it BEFORE the
+    # other 9 fan out so the user lands on Reveal with the image already there.
+    hero_idx = len(ages) - 1
+    yield await _one(hero_idx, ages[hero_idx], "high", high)
+
     tasks = []
     for i, age in enumerate(ages):
-        tasks.append(asyncio.create_task(_one(i, age, "high", high)))
+        if i != hero_idx:
+            tasks.append(asyncio.create_task(_one(i, age, "high", high)))
         tasks.append(asyncio.create_task(_one(i, age, "low", low)))
 
     for coro in asyncio.as_completed(tasks):
@@ -589,9 +596,16 @@ async def _fan_out_portraits_branched(
             "portrait": portrait.model_dump(),
         }
 
+    # Same hero-first treatment as the non-branched flow: prioritize the
+    # final-year high portrait so Reveal/Chat have it before anything else.
+    # If it's preserved (intervention.year is past target — rare), skip.
+    hero_idx = len(ages) - 1
+    if hero_idx not in preserved_indices:
+        yield await _one(hero_idx, ages[hero_idx], "high", high)
+
     tasks = []
     for i, age in enumerate(ages):
-        if i not in preserved_indices:
+        if i not in preserved_indices and i != hero_idx:
             tasks.append(asyncio.create_task(_one(i, age, "high", high)))
         # Low always regenerates.
         tasks.append(asyncio.create_task(_one(i, age, "low", low)))
