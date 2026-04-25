@@ -1,11 +1,8 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
-// Five portrait sources representing the user at different ages.
-// Using picsum.photos with stable seeds — guaranteed to load.
-// The seeds aren't real portraits; the heavy filter treatment + vignette make
-// them feel like atmospheric portraits. The SVG fallback figure underneath
-// keeps the portrait frame reading as "a person" if the image fails.
+// picsum seeds aren't real portraits — the filter/vignette + SVG fallback figure
+// underneath are what make the frame read as "a person".
 export const PORTRAITS: Record<number, string> = {
   32: "https://picsum.photos/seed/sarah-thirtytwo/900/1200",
   38: "https://picsum.photos/seed/sarah-thirtyeight/900/1200",
@@ -44,7 +41,6 @@ export function Portrait({
   const src = PORTRAITS[portraitAge];
   return (
     <div className={`portrait ${mood} ${className}`} style={style}>
-      {/* fallback abstract figure sits underneath; image overlays it when loaded */}
       <svg
         viewBox="0 0 100 130"
         preserveAspectRatio="xMidYMid slice"
@@ -117,7 +113,19 @@ export function Mark() {
   return <span className="mark">AlterEgo</span>;
 }
 
-// ---- Streaming text hook ----
+export function Wave({ style }: { style?: CSSProperties }) {
+  return (
+    <div className="wave" aria-hidden style={style}>
+      <span />
+      <span />
+      <span />
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+}
+
 export function useStreamedText(
   full: string,
   speedMs = 22,
@@ -138,7 +146,7 @@ export function useStreamedText(
     const tick = () => {
       if (cancelled) return;
       if (i >= full.length) {
-        onDone?.();
+        if (!cancelled) onDone?.();
         return;
       }
       const chunk = 1 + Math.floor(Math.random() * 2);
@@ -158,15 +166,12 @@ export function useStreamedText(
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
+    // onDone intentionally excluded; restarting on a fresh callback identity would re-stream the same text.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [full, start]);
+  }, [full, start, speedMs]);
   return text;
 }
 
-// Helpers
-export function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t;
-}
 export function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
 }

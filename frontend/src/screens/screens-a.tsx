@@ -1,16 +1,10 @@
 import { useEffect, useState } from "react";
-import { CornerLabel, Mark, Meta, Portrait, useStreamedText } from "../atoms";
+import type { ScreenProps } from "../App";
+import { CornerLabel, Mark, Meta, Portrait, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
 import type { Profile } from "../types";
 
-interface BaseProps {
-  onContinue: () => void;
-  profile: Profile;
-  setProfile: (p: Profile) => void;
-}
-
-// ============ 01 LANDING ============
-export function ScreenLanding({ onContinue }: { onContinue: () => void }) {
+export function ScreenLanding({ onContinue }: ScreenProps) {
   return (
     <div
       className="screen-inner"
@@ -99,7 +93,6 @@ export function ScreenLanding({ onContinue }: { onContinue: () => void }) {
   );
 }
 
-// ============ 02 INTAKE ============
 type IntakeField =
   | { key: keyof Profile; label: string; placeholder: string; type: "text" | "textarea"; suffix?: string }
   | { key: keyof Profile; label: string; placeholder: string; type: "number"; suffix?: string };
@@ -130,7 +123,7 @@ const INTAKE_FIELDS: IntakeField[] = [
   },
 ];
 
-export function ScreenIntake({ onContinue, profile, setProfile }: BaseProps) {
+export function ScreenIntake({ onContinue, profile, setProfile }: ScreenProps) {
   const [step, setStep] = useState(0);
   const cur = INTAKE_FIELDS[step];
 
@@ -271,7 +264,6 @@ export function ScreenIntake({ onContinue, profile, setProfile }: BaseProps) {
   );
 }
 
-// ============ 03 PROCESSING ============
 const PROCESSING_LINES = [
   "Reading what you wrote.",
   "Drafting the people in your life.",
@@ -281,7 +273,7 @@ const PROCESSING_LINES = [
   "Letting your future self get older.",
 ];
 
-export function ScreenProcessing({ onContinue }: { onContinue: () => void }) {
+export function ScreenProcessing({ onContinue }: ScreenProps) {
   const [lineIdx, setLineIdx] = useState(0);
   useEffect(() => {
     const t = setInterval(() => {
@@ -311,7 +303,6 @@ export function ScreenProcessing({ onContinue }: { onContinue: () => void }) {
       </div>
       <CornerLabel pos="tr">simulating · do not refresh</CornerLabel>
 
-      {/* slow drifting concentric rings */}
       <svg
         width="640"
         height="640"
@@ -389,9 +380,10 @@ export function ScreenProcessing({ onContinue }: { onContinue: () => void }) {
   );
 }
 
-// ============ 04 REVEAL ============
-export function ScreenReveal({ onContinue, profile }: BaseProps) {
-  const [phase, setPhase] = useState(0); // 0: black, 1: portrait, 2: name, 3: text streaming
+type RevealPhase = 0 | 1 | 2 | 3;
+
+export function ScreenReveal({ onContinue, profile }: ScreenProps) {
+  const [phase, setPhase] = useState<RevealPhase>(0);
   useEffect(() => {
     const t1 = setTimeout(() => setPhase(1), 900);
     const t2 = setTimeout(() => setPhase(2), 3400);
@@ -479,14 +471,7 @@ export function ScreenReveal({ onContinue, profile }: BaseProps) {
               animation: "fade-in 700ms var(--ease) both",
             }}
           >
-            <div className="wave" aria-hidden>
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-            </div>
+            <Wave />
             <span className="meta" style={{ color: "var(--accent)" }}>
               future self speaking
             </span>

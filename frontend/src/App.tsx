@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ComponentType } from "react";
+import { clamp } from "./atoms";
 import { AE_DATA } from "./data";
 import type { Profile } from "./types";
 import {
@@ -15,7 +16,7 @@ import {
   ScreenTimeline,
 } from "./screens/screens-b";
 
-interface ScreenProps {
+export interface ScreenProps {
   onContinue: () => void;
   onRestart: () => void;
   profile: Profile;
@@ -28,55 +29,51 @@ interface ScreenDef {
   label: string;
 }
 
-// Each screen ignores the props it doesn't use; the wrapper passes them all.
 const SCREENS: ScreenDef[] = [
-  { key: "landing", component: ScreenLanding as ComponentType<ScreenProps>, label: "01 cold open" },
-  { key: "intake", component: ScreenIntake as ComponentType<ScreenProps>, label: "02 intake" },
-  { key: "processing", component: ScreenProcessing as ComponentType<ScreenProps>, label: "03 processing" },
-  { key: "reveal", component: ScreenReveal as ComponentType<ScreenProps>, label: "04 reveal" },
-  { key: "chat", component: ScreenChat as ComponentType<ScreenProps>, label: "05 chat" },
-  { key: "timeline", component: ScreenTimeline as ComponentType<ScreenProps>, label: "06 timeline" },
-  { key: "slider", component: ScreenSlider as ComponentType<ScreenProps>, label: "07 slider" },
-  { key: "encore", component: ScreenEncore as ComponentType<ScreenProps>, label: "08 encore" },
+  { key: "landing", component: ScreenLanding, label: "01 cold open" },
+  { key: "intake", component: ScreenIntake, label: "02 intake" },
+  { key: "processing", component: ScreenProcessing, label: "03 processing" },
+  { key: "reveal", component: ScreenReveal, label: "04 reveal" },
+  { key: "chat", component: ScreenChat, label: "05 chat" },
+  { key: "timeline", component: ScreenTimeline, label: "06 timeline" },
+  { key: "slider", component: ScreenSlider, label: "07 slider" },
+  { key: "encore", component: ScreenEncore, label: "08 encore" },
 ];
 
 export default function App() {
   const [idx, setIdx] = useState(0);
   const [profile, setProfile] = useState<Profile>({ ...AE_DATA.profile });
 
-  const go = (i: number) => setIdx(Math.max(0, Math.min(SCREENS.length - 1, i)));
-  const next = () => go(idx + 1);
-  const restart = () => go(0);
+  const go = (i: number) => setIdx(clamp(i, 0, SCREENS.length - 1));
+  const next = () => setIdx((i) => clamp(i + 1, 0, SCREENS.length - 1));
+  const restart = () => setIdx(0);
 
-  // keyboard shortcuts: ← / →
+  const idxRef = useRef(idx);
+  idxRef.current = idx;
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
       if (target?.matches?.("input, textarea")) return;
-      if (e.key === "ArrowRight") go(idx + 1);
-      if (e.key === "ArrowLeft") go(idx - 1);
+      if (e.key === "ArrowRight") go(idxRef.current + 1);
+      if (e.key === "ArrowLeft") go(idxRef.current - 1);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [idx]);
+  }, []);
+
+  const Active = SCREENS[idx].component;
 
   return (
     <div id="stage" className="grain" data-screen-label={SCREENS[idx].label}>
-      {SCREENS.map(({ key, component: C }, i) => (
-        <div key={key} className={"screen" + (i === idx ? " active" : "")}>
-          {/* mount only when active to avoid timers running everywhere */}
-          {i === idx && (
-            <C
-              onContinue={next}
-              onRestart={restart}
-              profile={profile}
-              setProfile={setProfile}
-            />
-          )}
-        </div>
-      ))}
+      <div key={SCREENS[idx].key} className="screen active">
+        <Active
+          onContinue={next}
+          onRestart={restart}
+          profile={profile}
+          setProfile={setProfile}
+        />
+      </div>
 
-      {/* dev nav — collapsed dot in bottom-right; expands on hover */}
       <div className="devnav">
         {SCREENS.map((s, i) => (
           <button key={s.key} className={i === idx ? "on" : ""} onClick={() => go(i)}>

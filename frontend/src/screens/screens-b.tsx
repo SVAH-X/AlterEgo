@@ -1,26 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ScreenProps } from "../App";
 import {
   CornerLabel,
   Mark,
   Meta,
   Portrait,
+  Wave,
   clamp,
   pickPortraitAge,
   useStreamedText,
 } from "../atoms";
 import type { PortraitMood } from "../atoms";
 import { AE_DATA } from "../data";
-import type { Checkpoint, Profile } from "../types";
+import type { Checkpoint, Tone } from "../types";
 
-interface BaseProps {
-  onContinue: () => void;
-  profile: Profile;
-}
-
-interface EncoreProps {
-  onRestart: () => void;
-  profile: Profile;
-}
+const TONE_COLOR: Record<Tone, string> = {
+  warn: "var(--warn)",
+  good: "var(--accent)",
+  neutral: "var(--ink-2)",
+};
 
 interface ChatMessage {
   role: "user" | "future";
@@ -28,8 +26,7 @@ interface ChatMessage {
   done: boolean;
 }
 
-// ============ 05 CHAT ============
-export function ScreenChat({ onContinue, profile }: BaseProps) {
+export function ScreenChat({ onContinue, profile }: ScreenProps) {
   const olderAge =
     (Number(profile.age) || 32) +
     ((Number(profile.targetYear) - Number(profile.presentYear)) || 20);
@@ -49,15 +46,17 @@ export function ScreenChat({ onContinue, profile }: BaseProps) {
     setPending(null);
   });
 
+  const askTimer = useRef<ReturnType<typeof setTimeout>>();
   function ask(q: string) {
     if (pending) return;
     const reply =
       replies[q] ||
       "I'm not sure yet. The simulation only goes so deep on what you just asked. Try one of the others.";
     setMessages((m) => [...m, { role: "user", text: q, done: true }]);
-    setTimeout(() => setPending({ question: q, answer: reply }), 700);
+    askTimer.current = setTimeout(() => setPending({ question: q, answer: reply }), 700);
     setInput("");
   }
+  useEffect(() => () => { if (askTimer.current) clearTimeout(askTimer.current); }, []);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -78,7 +77,6 @@ export function ScreenChat({ onContinue, profile }: BaseProps) {
       </div>
       <CornerLabel pos="tr">interview · {profile.targetYear || 2046}</CornerLabel>
 
-      {/* Left: portrait column */}
       <div
         style={{
           borderRight: "1px solid var(--line-soft)",
@@ -109,18 +107,7 @@ export function ScreenChat({ onContinue, profile }: BaseProps) {
           </Meta>
         </div>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 10, color: "var(--ink-3)" }}>
-          <div
-            className="wave"
-            aria-hidden
-            style={{ opacity: pending ? 1 : 0.25, transition: "opacity 500ms" }}
-          >
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
+          <Wave style={{ opacity: pending ? 1 : 0.25, transition: "opacity 500ms" }} />
           <span className="meta">{pending ? "speaking" : "listening"}</span>
         </div>
 
@@ -141,7 +128,6 @@ export function ScreenChat({ onContinue, profile }: BaseProps) {
         </div>
       </div>
 
-      {/* Right: conversation */}
       <div
         style={{ display: "flex", flexDirection: "column", height: "100%", padding: "100px 60px 32px" }}
       >
@@ -173,7 +159,6 @@ export function ScreenChat({ onContinue, profile }: BaseProps) {
           </div>
         </div>
 
-        {/* Suggestion chips + input */}
         <div style={{ maxWidth: 700, margin: "32px auto 0", width: "100%" }}>
           <div
             style={{
@@ -264,8 +249,7 @@ function Message({ m }: { m: ChatMessage }) {
   );
 }
 
-// ============ 06 TIMELINE ============
-export function ScreenTimeline({ onContinue, profile }: BaseProps) {
+export function ScreenTimeline({ onContinue, profile }: ScreenProps) {
   const checkpoints = AE_DATA.checkpointsHigh;
   const startYear = profile.presentYear || 2026;
   const endYear = profile.targetYear || 2046;
@@ -301,7 +285,6 @@ export function ScreenTimeline({ onContinue, profile }: BaseProps) {
       </div>
       <CornerLabel pos="tr">timeline · drag to scrub</CornerLabel>
 
-      {/* portrait pane */}
       <div
         style={{
           borderRight: "1px solid var(--line-soft)",
@@ -342,7 +325,6 @@ export function ScreenTimeline({ onContinue, profile }: BaseProps) {
         </div>
       </div>
 
-      {/* checkpoint pane */}
       <div style={{ padding: "100px 60px 200px", overflow: "auto" }}>
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           <Meta style={{ marginBottom: 18 }}>the years up to {currentYear}</Meta>
@@ -374,7 +356,6 @@ export function ScreenTimeline({ onContinue, profile }: BaseProps) {
         </div>
       </div>
 
-      {/* timeline scrubber */}
       <div
         style={{
           position: "absolute",
@@ -445,8 +426,7 @@ function CheckpointCard({
   active: boolean;
   visible: boolean;
 }) {
-  const tone =
-    c.tone === "warn" ? "var(--warn)" : c.tone === "good" ? "var(--accent)" : "var(--ink-2)";
+  const toneColor = TONE_COLOR[c.tone];
   return (
     <div
       className="card"
@@ -473,7 +453,7 @@ function CheckpointCard({
             width: 6,
             height: 6,
             borderRadius: "50%",
-            background: tone,
+            background: toneColor,
             opacity: 0.6,
           }}
         />
@@ -521,8 +501,7 @@ function CheckpointCard({
   );
 }
 
-// ============ 07 SLIDER ============
-export function ScreenSlider({ onContinue, profile }: BaseProps) {
+export function ScreenSlider({ onContinue, profile }: ScreenProps) {
   const [hours, setHours] = useState(profile.workHours || 65);
   const startYear = profile.presentYear || 2026;
   const endYear = profile.targetYear || 2046;
@@ -552,7 +531,6 @@ export function ScreenSlider({ onContinue, profile }: BaseProps) {
       </div>
       <CornerLabel pos="tr">re-simulate · one variable</CornerLabel>
 
-      {/* portrait at target year */}
       <div
         style={{
           borderRight: "1px solid var(--line-soft)",
@@ -595,7 +573,6 @@ export function ScreenSlider({ onContinue, profile }: BaseProps) {
         </div>
       </div>
 
-      {/* trajectory + slider */}
       <div style={{ padding: "100px 60px 280px", overflow: "auto" }}>
         <div style={{ maxWidth: 760, margin: "0 auto" }}>
           <Meta style={{ marginBottom: 16 }}>change one thing</Meta>
@@ -648,7 +625,6 @@ export function ScreenSlider({ onContinue, profile }: BaseProps) {
             </div>
           </div>
 
-          {/* optimistic path indicator */}
           <div style={{ marginBottom: 48 }}>
             <div
               style={{
@@ -686,7 +662,6 @@ export function ScreenSlider({ onContinue, profile }: BaseProps) {
             </div>
           </div>
 
-          {/* a single rewriting checkpoint card to demonstrate live re-sim */}
           <div style={{ borderTop: "1px solid var(--line-soft)", paddingTop: 32 }}>
             <Meta style={{ marginBottom: 18 }}>a representative year · {checkpoints[2].year}</Meta>
             <CheckpointCard c={checkpoints[2]} active visible />
@@ -694,7 +669,6 @@ export function ScreenSlider({ onContinue, profile }: BaseProps) {
         </div>
       </div>
 
-      {/* bottom continue */}
       <div
         style={{
           position: "absolute",
@@ -718,8 +692,7 @@ export function ScreenSlider({ onContinue, profile }: BaseProps) {
   );
 }
 
-// ============ 08 ENCORE ============
-export function ScreenEncore({ onRestart, profile }: EncoreProps) {
+export function ScreenEncore({ onRestart, profile }: ScreenProps) {
   const baseAge = profile.age || 32;
   const finalAge = baseAge + ((profile.targetYear || 2046) - (profile.presentYear || 2026));
   const high = AE_DATA.checkpointsHigh[AE_DATA.checkpointsHigh.length - 1];
