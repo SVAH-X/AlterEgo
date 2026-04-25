@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChangeEvent } from "react";
 import type { ScreenProps, SimStreamPhase } from "../App";
 import { CornerLabel, Mark, Meta, Portrait, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
@@ -10,17 +9,6 @@ import romanStatue from "../assets/roman-half-blur.png";
 import darkClouds from "../assets/dark-grey-clouds-over-the-ocean.jpg";
 
 export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  function handleFile(e: ChangeEvent<HTMLInputElement>) {
-    // We never read or store the file — we only remember that one was given.
-    // The future image-gen pipeline will own the actual upload.
-    if (e.target.files && e.target.files.length > 0) {
-      setSelfieUploaded(true);
-      onContinue();
-    }
-  }
-
   function skip() {
     setSelfieUploaded(false);
     onContinue();
@@ -33,19 +21,12 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
       </div>
       <CornerLabel pos="tr">v 0.3 · simulation build</CornerLabel>
 
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFile}
-        style={{ display: "none" }}
-      />
-
-      {/* Whole hero is the upload target — click anywhere to pick a file. */}
+      {/* Whole hero advances to the selfie choice screen. */}
       <button
         type="button"
-        onClick={() => fileRef.current?.click()}
-        aria-label="Upload a selfie to begin"
+        onClick={onContinue}
+        aria-label="Click anywhere to begin"
+        className="landing-hero"
         style={{
           all: "unset",
           cursor: "pointer",
@@ -54,25 +35,26 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
           display: "grid",
           gridTemplateColumns: "minmax(0, 1.25fr) minmax(0, 1fr)",
           alignItems: "center",
-          padding: "100px clamp(56px, 6vw, 96px) 140px",
-          gap: "clamp(32px, 4vw, 72px)",
+          padding: "clamp(72px, 11vh, 100px) clamp(20px, 6vw, 96px) clamp(96px, 16vh, 140px)",
+          gap: "clamp(24px, 4vw, 72px)",
           boxSizing: "border-box",
           animation: "fade-in 1100ms var(--ease) 200ms both",
         }}
       >
         <div
+          className="landing-hero-text"
           style={{
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: 56,
+            gap: "clamp(28px, 5vw, 56px)",
           }}
         >
           <h1
             aria-label="Alter Ego"
-            className="serif"
+            className="serif landing-hero-title"
             style={{
-              fontSize: "clamp(140px, 19vw, 280px)",
+              fontSize: "clamp(72px, 19vw, 280px)",
               lineHeight: 0.6,
               fontWeight: 400,
               letterSpacing: "-0.025em",
@@ -106,13 +88,14 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
               animation: "fade-in 900ms var(--ease) 1300ms both",
             }}
           >
-            Click anywhere to upload a selfie
+            Click anywhere to begin
             <br />
             <span style={{ color: "var(--accent)" }}>see where your life is heading</span>
           </div>
         </div>
 
         <div
+          className="landing-hero-image"
           style={{
             position: "relative",
             justifySelf: "center",
@@ -162,11 +145,9 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
           e.stopPropagation();
           skip();
         }}
-        className="landing-skip"
+        className="landing-skip landing-bottom-left"
         style={{
           position: "absolute",
-          bottom: 28,
-          left: 40,
           zIndex: 6,
           animation: "fade-in 900ms var(--ease) 1900ms both",
         }}
@@ -176,10 +157,9 @@ export function ScreenLanding({ onContinue, setSelfieUploaded }: ScreenProps) {
 
       {/* Runtime caption — pinned bottom-right */}
       <div
+        className="landing-bottom-right"
         style={{
           position: "absolute",
-          bottom: 32,
-          right: 40,
           fontFamily: "var(--mono)",
           fontSize: 10,
           letterSpacing: "0.22em",
@@ -832,7 +812,6 @@ export function ScreenReveal({ onContinue, profile, simulation, selfieUploaded }
               transition: "opacity 2200ms var(--ease)",
             }}
           >
-            <Portrait age={olderAge} mood="dim" blurred={!selfieUploaded} />
             {(() => {
               const p = nearestPortrait(simulation?.agedPortraits, "high", profile.targetYear);
               if (p?.imageUrl) {
@@ -844,7 +823,7 @@ export function ScreenReveal({ onContinue, profile, simulation, selfieUploaded }
                   />
                 );
               }
-              return <Portrait age={olderAge} mood="dim" />;
+              return <Portrait age={olderAge} mood="dim" blurred={!selfieUploaded} />;
             })()}
           </div>
 
