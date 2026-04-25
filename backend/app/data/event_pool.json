@@ -1,0 +1,374 @@
+[
+  {
+    "id": "promotion_you_could_not_say_no_to",
+    "title": "The promotion you took because you couldn't say no",
+    "summary": "A senior role opens after a colleague's exit. The hours were already long; now twelve more direct reports report to you. You accept on a Tuesday and tell yourself it's a two-year stretch. The two-year stretch becomes the shape of the decade.",
+    "category": "career",
+    "year_window": [2027, 2034],
+    "severity_baseline": 0.7,
+    "triggers": [
+      {"aspect": "career_momentum", "op": ">=", "threshold": 0.6},
+      {"aspect": "work_intensity",  "op": ">=", "threshold": 0.55}
+    ],
+    "state_impact": {
+      "work_intensity":     0.12,
+      "career_momentum":    0.08,
+      "social_isolation":   0.05,
+      "family_distance":    0.04,
+      "meaning_drift":      0.03
+    }
+  },
+  {
+    "id": "first_cardiologist_appointment",
+    "title": "The first cardiologist appointment",
+    "summary": "Resting heart rate has been climbing for two years. The doctor is calm, which scares you more than concern would. You cut caffeine. You don't cut hours. The numbers come back the same in the spring.",
+    "category": "health",
+    "year_window": [2028, 2042],
+    "severity_baseline": 0.7,
+    "triggers": [
+      {"aspect": "health_strain",  "op": ">=", "threshold": 0.55},
+      {"aspect": "work_intensity", "op": ">=", "threshold": 0.75}
+    ],
+    "state_impact": {
+      "health_strain":      0.10,
+      "financial_pressure": 0.04,
+      "meaning_drift":      0.05
+    }
+  },
+  {
+    "id": "ai_displacement_white_collar",
+    "title": "AI displacement reaches your industry",
+    "summary": "Generative tools begin handling work that paid the rent five years ago — copy, basic analysis, mid-level decks. Some firms quietly cut 15–30% of the knowledge-work seats; others restructure around AI-augmented output. The rules of who's safe rewrite themselves.",
+    "category": "macro",
+    "year_window": [2027, 2032],
+    "severity_baseline": 0.75,
+    "triggers": [
+      {"aspect": "career_momentum",   "op": "<=", "threshold": 0.55},
+      {"aspect": "financial_pressure","op": ">=", "threshold": 0.4}
+    ],
+    "state_impact": {
+      "financial_pressure": 0.18,
+      "career_momentum":   -0.15,
+      "meaning_drift":      0.08
+    }
+  },
+  {
+    "id": "thirties_recession",
+    "title": "The 2030s recession nobody timed right",
+    "summary": "Two years of contraction, layoffs in waves, the words 'soft landing' said by the people whose landing was softest. Your industry isn't the worst hit, but the rope you'd been climbing thins.",
+    "category": "macro",
+    "year_window": [2030, 2034],
+    "severity_baseline": 0.75,
+    "triggers": [
+      {"aspect": "financial_pressure", "op": ">=", "threshold": 0.35},
+      {"aspect": "career_momentum",    "op": "<=", "threshold": 0.6}
+    ],
+    "state_impact": {
+      "financial_pressure": 0.20,
+      "career_momentum":   -0.10,
+      "social_isolation":   0.04
+    }
+  },
+  {
+    "id": "siblings_wedding_on_zoom",
+    "title": "Your sister's wedding, on Zoom",
+    "summary": "Q3 board prep lands the same week as the ceremony abroad. You send a video. She says she understands. You don't speak again for nine months. Neither of you names why.",
+    "category": "family",
+    "year_window": [2028, 2038],
+    "severity_baseline": 0.6,
+    "triggers": [
+      {"aspect": "work_intensity",  "op": ">=", "threshold": 0.7},
+      {"aspect": "family_distance", "op": ">=", "threshold": 0.4}
+    ],
+    "state_impact": {
+      "family_distance":    0.18,
+      "meaning_drift":      0.06
+    }
+  },
+  {
+    "id": "parents_first_health_scare",
+    "title": "A parent's first real diagnosis",
+    "summary": "A phone call you'd been imagining for years arrives on a Tuesday afternoon. It's not the worst version. It's the version that asks you what kind of child you've decided to be, with the hours you have.",
+    "category": "family",
+    "year_window": [2028, 2046],
+    "severity_baseline": 0.75,
+    "triggers": [
+      {"aspect": "family_distance", "op": ">=", "threshold": 0.3}
+    ],
+    "state_impact": {
+      "family_distance":   -0.10,
+      "meaning_drift":     -0.05,
+      "work_intensity":    -0.05,
+      "health_strain":      0.05
+    }
+  },
+  {
+    "id": "parent_dies",
+    "title": "The summer you lose a parent",
+    "summary": "Diagnosis in May. Eight weeks at the lake house through August. You close the laptop more than you thought you could. After: a year that doesn't index quite right. You will remember the porch and the way they laughed at your impressions; you will not remember what you missed at work.",
+    "category": "family",
+    "year_window": [2032, 2046],
+    "severity_baseline": 0.9,
+    "triggers": [
+      {"aspect": "family_distance", "op": ">=", "threshold": 0.0}
+    ],
+    "state_impact": {
+      "family_distance":   -0.20,
+      "meaning_drift":     -0.10,
+      "career_momentum":   -0.05,
+      "work_intensity":    -0.10,
+      "relationship_strain":-0.05
+    }
+  },
+  {
+    "id": "close_friend_drifts",
+    "title": "The friend who stopped reaching back",
+    "summary": "It wasn't a fight. There wasn't a moment. The texts thinned, the plans got rescheduled, and one day you realized you hadn't seen them in fourteen months. The grief of a friendship dying without a funeral.",
+    "category": "social",
+    "year_window": [2027, 2040],
+    "severity_baseline": 0.5,
+    "triggers": [
+      {"aspect": "social_isolation", "op": ">=", "threshold": 0.55},
+      {"aspect": "work_intensity",   "op": ">=", "threshold": 0.7}
+    ],
+    "state_impact": {
+      "social_isolation":   0.10,
+      "meaning_drift":      0.06
+    }
+  },
+  {
+    "id": "side_project_finally_finished",
+    "title": "The thing you finally made on Saturday mornings",
+    "summary": "Two years of weekend hours on something nobody asked for. You launch it badly, on purpose, and three people who matter notice. It pays for itself by year-end. You start dreaming about it on weekdays.",
+    "category": "career",
+    "year_window": [2027, 2036],
+    "severity_baseline": 0.65,
+    "triggers": [
+      {"aspect": "meaning_drift",    "op": ">=", "threshold": 0.4},
+      {"aspect": "work_intensity",   "op": "<=", "threshold": 0.7}
+    ],
+    "state_impact": {
+      "meaning_drift":     -0.18,
+      "career_momentum":    0.10,
+      "financial_pressure": 0.03
+    }
+  },
+  {
+    "id": "the_quiet_sunday",
+    "title": "A quiet Sunday with the list in the drawer",
+    "summary": "No event. You sit at the kitchen counter for ninety minutes without picking up the phone. Start a list of what you would have done differently. Stop at item three. The list stays in the drawer. You think about it more than you think about most things.",
+    "category": "personal",
+    "year_window": [2034, 2044],
+    "severity_baseline": 0.55,
+    "triggers": [
+      {"aspect": "meaning_drift", "op": ">=", "threshold": 0.6}
+    ],
+    "state_impact": {
+      "meaning_drift":      0.04
+    }
+  },
+  {
+    "id": "burnout_collision",
+    "title": "The morning your body said no",
+    "summary": "You wake up and you can't make yourself care about the meeting. Not 'tired' — something else. You take the day. Then a week. The thing you're afraid of is that the body has been right longer than the calendar admitted.",
+    "category": "health",
+    "year_window": [2028, 2040],
+    "severity_baseline": 0.8,
+    "triggers": [
+      {"aspect": "health_strain",   "op": ">=", "threshold": 0.7},
+      {"aspect": "meaning_drift",   "op": ">=", "threshold": 0.6}
+    ],
+    "state_impact": {
+      "health_strain":      0.10,
+      "work_intensity":    -0.20,
+      "career_momentum":   -0.08,
+      "meaning_drift":     -0.05
+    }
+  },
+  {
+    "id": "the_leap",
+    "title": "The leap, taken on purpose",
+    "summary": "Studio revenue crosses your salary. Six months of runway saved. You resign in person. Cry in the car. Drive to the studio. First year is hard. Second year is yours.",
+    "category": "career",
+    "year_window": [2029, 2040],
+    "severity_baseline": 0.75,
+    "triggers": [
+      {"aspect": "meaning_drift",      "op": ">=", "threshold": 0.55},
+      {"aspect": "career_momentum",    "op": ">=", "threshold": 0.5},
+      {"aspect": "financial_pressure", "op": "<=", "threshold": 0.5}
+    ],
+    "state_impact": {
+      "meaning_drift":     -0.25,
+      "career_momentum":    0.15,
+      "financial_pressure": 0.10,
+      "work_intensity":    -0.05
+    }
+  },
+  {
+    "id": "reorg_swallows_the_work",
+    "title": "The reorg that made the work unrecognizable",
+    "summary": "Acquisition. Restructure. Your team's output folded into something automated and impersonal. You stay for the equity vest. Sixteen more months. By the time you leave, the thing you built is no longer in the building.",
+    "category": "career",
+    "year_window": [2029, 2040],
+    "severity_baseline": 0.7,
+    "triggers": [
+      {"aspect": "career_momentum", "op": ">=", "threshold": 0.5},
+      {"aspect": "meaning_drift",   "op": ">=", "threshold": 0.4}
+    ],
+    "state_impact": {
+      "meaning_drift":      0.15,
+      "financial_pressure":-0.05,
+      "career_momentum":   -0.08
+    }
+  },
+  {
+    "id": "friend_makes_it",
+    "title": "Someone you came up with becomes the kind of person magazines write about",
+    "summary": "You're glad for them. You're also not. Both are true. You text 'congrats' and don't read what they post for a week.",
+    "category": "social",
+    "year_window": [2029, 2040],
+    "severity_baseline": 0.45,
+    "triggers": [
+      {"aspect": "career_momentum", "op": "<=", "threshold": 0.55},
+      {"aspect": "meaning_drift",   "op": ">=", "threshold": 0.5}
+    ],
+    "state_impact": {
+      "meaning_drift":      0.08,
+      "social_isolation":   0.04
+    }
+  },
+  {
+    "id": "partner_arrives",
+    "title": "The person who stays through the bad week",
+    "summary": "Not a montage. A specific Wednesday — they keep showing up after the kind of stretch that taught you not to expect that. You stop bracing for them to leave around month eight. That's when it changes.",
+    "category": "personal",
+    "year_window": [2027, 2036],
+    "severity_baseline": 0.6,
+    "triggers": [
+      {"aspect": "social_isolation",   "op": "<=", "threshold": 0.6},
+      {"aspect": "relationship_strain","op": "<=", "threshold": 0.5}
+    ],
+    "state_impact": {
+      "relationship_strain":-0.20,
+      "social_isolation":   -0.10,
+      "meaning_drift":      -0.08
+    }
+  },
+  {
+    "id": "partner_leaves",
+    "title": "The breakup you saw coming six months out",
+    "summary": "No villain. They tell you something you already half-knew. The apartment doesn't change shape; you do, slowly. Year after, you realize parts of you needed that ending.",
+    "category": "personal",
+    "year_window": [2028, 2042],
+    "severity_baseline": 0.7,
+    "triggers": [
+      {"aspect": "relationship_strain","op": ">=", "threshold": 0.6},
+      {"aspect": "work_intensity",     "op": ">=", "threshold": 0.7}
+    ],
+    "state_impact": {
+      "relationship_strain":-0.10,
+      "social_isolation":    0.10,
+      "meaning_drift":       0.10
+    }
+  },
+  {
+    "id": "child_arrives",
+    "title": "The first night you brought them home",
+    "summary": "You'd read the books. None of them prepared you for the particular silence at 4am with this small, specific person breathing against your chest.",
+    "category": "personal",
+    "year_window": [2028, 2040],
+    "severity_baseline": 0.85,
+    "triggers": [
+      {"aspect": "relationship_strain","op": "<=", "threshold": 0.4}
+    ],
+    "state_impact": {
+      "meaning_drift":     -0.20,
+      "work_intensity":    -0.05,
+      "financial_pressure": 0.10,
+      "health_strain":      0.05,
+      "family_distance":   -0.05
+    }
+  },
+  {
+    "id": "climate_displacement_local",
+    "title": "The summer the city you knew became unfamiliar",
+    "summary": "A heat dome that doesn't break. Smoke seasons that overlap. The places you walked at 22 are not places you walk now. Some neighbors leave. You stay, and notice you've stopped expecting the seasons to follow the calendar.",
+    "category": "climate",
+    "year_window": [2028, 2046],
+    "severity_baseline": 0.6,
+    "triggers": [
+      {"aspect": "financial_pressure","op": ">=", "threshold": 0.0}
+    ],
+    "state_impact": {
+      "financial_pressure": 0.04,
+      "health_strain":      0.05,
+      "meaning_drift":      0.05
+    }
+  },
+  {
+    "id": "housing_crunch",
+    "title": "The year you stopped pretending you'd buy a house",
+    "summary": "You ran the numbers again on a Sunday. Then again on Tuesday. Something that had been a 'someday' became, quietly, a 'no.' You don't tell anyone for a while.",
+    "category": "personal",
+    "year_window": [2027, 2038],
+    "severity_baseline": 0.5,
+    "triggers": [
+      {"aspect": "financial_pressure", "op": ">=", "threshold": 0.55}
+    ],
+    "state_impact": {
+      "financial_pressure": 0.05,
+      "meaning_drift":      0.06,
+      "career_momentum":   -0.03
+    }
+  },
+  {
+    "id": "mentor_enters",
+    "title": "The conversation that cracks something open",
+    "summary": "Coffee with someone fifteen years ahead of you. They say one true thing about your work that you've been waiting for someone to say. You don't sleep well that night, and it's the good kind of not sleeping.",
+    "category": "career",
+    "year_window": [2027, 2036],
+    "severity_baseline": 0.5,
+    "triggers": [
+      {"aspect": "meaning_drift", "op": ">=", "threshold": 0.45}
+    ],
+    "state_impact": {
+      "meaning_drift":     -0.15,
+      "career_momentum":    0.08
+    }
+  },
+  {
+    "id": "campaign_known_for_being_yours",
+    "title": "Work that becomes known for being yours",
+    "summary": "A piece of work, finally — that is named after you in a sentence by people who don't owe you anything. You stop apologizing for the size of what you've built.",
+    "category": "career",
+    "year_window": [2031, 2044],
+    "severity_baseline": 0.7,
+    "triggers": [
+      {"aspect": "career_momentum", "op": ">=", "threshold": 0.65},
+      {"aspect": "meaning_drift",   "op": "<=", "threshold": 0.4}
+    ],
+    "state_impact": {
+      "meaning_drift":     -0.15,
+      "career_momentum":    0.15,
+      "financial_pressure":-0.05
+    }
+  },
+  {
+    "id": "mental_health_winter",
+    "title": "The winter you couldn't pretend through",
+    "summary": "Not the kind of bad you can fix with a vacation. You start seeing someone. It is slow. It takes a year before it begins to take. You don't tell most people.",
+    "category": "health",
+    "year_window": [2027, 2042],
+    "severity_baseline": 0.7,
+    "triggers": [
+      {"aspect": "meaning_drift",     "op": ">=", "threshold": 0.65},
+      {"aspect": "social_isolation",  "op": ">=", "threshold": 0.6}
+    ],
+    "state_impact": {
+      "meaning_drift":     -0.10,
+      "health_strain":     -0.05,
+      "social_isolation":  -0.05,
+      "financial_pressure": 0.04
+    }
+  }
+]

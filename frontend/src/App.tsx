@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ComponentType } from "react";
 import { clamp } from "./atoms";
 import { AE_DATA } from "./data";
-import type { Profile } from "./types";
+import type { Profile, SimulationData } from "./types";
 import {
   ScreenIntake,
   ScreenLanding,
@@ -18,9 +18,15 @@ import {
 
 export interface ScreenProps {
   onContinue: () => void;
+  onBack: () => void;
+  onJumpTo: (key: string) => void;
   onRestart: () => void;
   profile: Profile;
   setProfile: (p: Profile) => void;
+  simulation: SimulationData | null;
+  setSimulation: (s: SimulationData | null) => void;
+  timelineViewed: boolean;
+  setTimelineViewed: (v: boolean) => void;
 }
 
 interface ScreenDef {
@@ -43,10 +49,37 @@ const SCREENS: ScreenDef[] = [
 export default function App() {
   const [idx, setIdx] = useState(0);
   const [profile, setProfile] = useState<Profile>({ ...AE_DATA.profile });
+  const [simulation, setSimulationState] = useState<SimulationData | null>(null);
+  // `timelineViewed` flips true when the user advances PAST the timeline screen
+  // (i.e., they've already watched the auto-play). On re-entry we skip replay
+  // and drop them at t=1 so they can directly intervene.
+  const [timelineViewed, setTimelineViewed] = useState(false);
 
   const go = (i: number) => setIdx(clamp(i, 0, SCREENS.length - 1));
-  const next = () => setIdx((i) => clamp(i + 1, 0, SCREENS.length - 1));
-  const restart = () => setIdx(0);
+  const next = () => {
+    setIdx((i) => {
+      // Mark the timeline as viewed when leaving it forward.
+      if (SCREENS[i].key === "timeline") setTimelineViewed(true);
+      return clamp(i + 1, 0, SCREENS.length - 1);
+    });
+  };
+  const back = () => setIdx((i) => clamp(i - 1, 0, SCREENS.length - 1));
+  const jumpTo = (key: string) => {
+    const j = SCREENS.findIndex((s) => s.key === key);
+    if (j >= 0) setIdx(j);
+  };
+  const restart = () => {
+    setSimulationState(null);
+    setTimelineViewed(false);
+    setIdx(0);
+  };
+  // Wrap setSimulation so a freshly arrived simulation (post-intervention or
+  // first generation) resets the "viewed" flag — the user will want auto-play
+  // for the new trajectory.
+  const setSimulation = (s: SimulationData | null) => {
+    setSimulationState(s);
+    setTimelineViewed(false);
+  };
 
   const idxRef = useRef(idx);
   idxRef.current = idx;
@@ -68,9 +101,15 @@ export default function App() {
       <div key={SCREENS[idx].key} className="screen active">
         <Active
           onContinue={next}
+          onBack={back}
+          onJumpTo={jumpTo}
           onRestart={restart}
           profile={profile}
           setProfile={setProfile}
+          simulation={simulation}
+          setSimulation={setSimulation}
+          timelineViewed={timelineViewed}
+          setTimelineViewed={setTimelineViewed}
         />
       </div>
 

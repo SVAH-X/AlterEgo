@@ -6,7 +6,11 @@ Tone = Literal["neutral", "warn", "good"]
 
 
 class Checkpoint(BaseModel):
-    """Mirrors frontend `src/types.ts` Checkpoint exactly."""
+    """Mirrors frontend `src/types.ts` Checkpoint exactly.
+
+    `tone` defaults to "neutral" when the model omits it — the wire shape
+    always carries it.
+    """
 
     year: int
     age: int
@@ -14,4 +18,4 @@ class Checkpoint(BaseModel):
     event: str
     did: str
     consequence: str
-    tone: Tone
+    tone: Tone = "neutral"
