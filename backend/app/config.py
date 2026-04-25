@@ -14,9 +14,12 @@ class Settings(BaseSettings):
     inference_plan: str = "B"
 
     # Anthropic (Plan B)
+    # All tiers default to Haiku 4.5 during testing — cheapest + fastest in the
+    # Claude family. Override per-tier in .env when polishing the demo (e.g.
+    # ANTHROPIC_MODEL_FUTURE_SELF=claude-opus-4-7 for the simulation call).
     anthropic_api_key: str = ""
-    anthropic_model_future_self: str = "claude-opus-4-7"
-    anthropic_model_high_signal: str = "claude-sonnet-4-6"
+    anthropic_model_future_self: str = "claude-haiku-4-5"
+    anthropic_model_high_signal: str = "claude-haiku-4-5"
     anthropic_model_peers: str = "claude-haiku-4-5"
 
     # Groq (Plan B noise tier; not used by the MVP path but kept for the router)

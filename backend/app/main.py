@@ -11,9 +11,10 @@ app = FastAPI(
 )
 
 settings = get_settings()
+# Permissive CORS for hackathon dev — Vite picks 5173/5174/5175 dynamically.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url, "http://localhost:5173"],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

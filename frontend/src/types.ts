@@ -29,3 +29,29 @@ export interface SimulationData {
   futureSelfOpening: string;
   futureSelfReplies: Record<string, string>;
 }
+
+// --- Streaming orchestration shapes ---
+
+export interface AgentSpec {
+  agent_id: string;
+  role: string;
+  name: string;
+  relationship: string;
+  voice: string;
+}
+
+export interface OutlineEvent {
+  year: number;
+  severity: number;
+  primary_actors: string[];
+  visibility: string[];
+  hint: string;
+}
+
+export type StreamEvent =
+  | { phase: "counting"; agents: AgentSpec[] }
+  | { phase: "plan"; outline: OutlineEvent[] }
+  | { phase: "event"; index: number; checkpoint: Checkpoint }
+  | { phase: "finalizing" }
+  | { phase: "complete"; simulation: SimulationData }
+  | { phase: "error"; message: string };
