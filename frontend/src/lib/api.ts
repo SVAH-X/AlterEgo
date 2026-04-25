@@ -19,11 +19,11 @@ export interface ChatHistoryMessage {
  */
 export async function* simulateStream(
   profile: Profile,
-  selfie: Blob,
+  selfie: Blob | null,
 ): AsyncIterableIterator<StreamEvent> {
   const form = new FormData();
   form.append("profile", JSON.stringify(profile));
-  form.append("selfie", selfie, "selfie.jpg");
+  if (selfie) form.append("selfie", selfie, "selfie.jpg");
   yield* readNDJSON(
     await fetch(`${BASE}/simulate`, {
       method: "POST",
@@ -43,14 +43,14 @@ export async function* simulateBranchStream(
   interventionYear: number,
   interventionText: string,
   originalSimulation: SimulationData,
-  selfie: Blob,
+  selfie: Blob | null,
 ): AsyncIterableIterator<StreamEvent> {
   const form = new FormData();
   form.append("profile", JSON.stringify(profile));
   form.append("intervention_year", String(interventionYear));
   form.append("intervention_text", interventionText);
   form.append("original_simulation", JSON.stringify(originalSimulation));
-  form.append("selfie", selfie, "selfie.jpg");
+  if (selfie) form.append("selfie", selfie, "selfie.jpg");
   yield* readNDJSON(
     await fetch(`${BASE}/simulate/branch`, {
       method: "POST",
