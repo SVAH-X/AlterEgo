@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ScreenProps, SimStreamPhase } from "../App";
-import { CornerLabel, Mark, Meta, Portrait, Wave, useStreamedText } from "../atoms";
+import { CornerLabel, Mark, Meta, PortraitImage, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
 import { nearestPortrait } from "../lib/portraits";
 import type { Profile } from "../types";
@@ -785,7 +785,7 @@ export function ScreenProcessing({
 
 type RevealPhase = 0 | 1 | 2 | 3;
 
-export function ScreenReveal({ onContinue, profile, simulation, selfieUploaded }: ScreenProps) {
+export function ScreenReveal({ onContinue, profile, simulation }: ScreenProps) {
   const [phase, setPhase] = useState<RevealPhase>(0);
   const { voiceMode, clonedVoiceId } = useVoice();
   const voicePrimed = useVoicePrimed();
@@ -871,16 +871,7 @@ export function ScreenReveal({ onContinue, profile, simulation, selfieUploaded }
           >
             {(() => {
               const p = nearestPortrait(simulation?.agedPortraits, "high", profile.targetYear);
-              if (p?.imageUrl) {
-                return (
-                  <img
-                    src={p.imageUrl}
-                    alt={`you at ${p.age}`}
-                    style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
-                  />
-                );
-              }
-              return <Portrait age={olderAge} mood="dim" blurred={!selfieUploaded} />;
+              return <PortraitImage src={p?.imageUrl} alt={p ? `you at ${p.age}` : "you"} />;
             })()}
           </div>
 
