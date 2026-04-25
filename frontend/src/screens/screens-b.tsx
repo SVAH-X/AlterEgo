@@ -651,28 +651,45 @@ export function ScreenTimeline({
               <div
                 style={{
                   position: "absolute",
-                  left: "50%",
+                  left: 12,
+                  right: 12,
                   bottom: 14,
-                  transform: "translateX(-50%)",
-                  padding: "8px 14px",
-                  border: "1px solid var(--accent-line)",
-                  borderRadius: 4,
-                  background: "rgba(20, 16, 12, 0.85)",
-                  backdropFilter: "blur(6px)",
-                  color: "var(--ink)",
-                  fontFamily: "var(--mono)",
-                  fontSize: 10,
-                  letterSpacing: "0.16em",
-                  textTransform: "lowercase",
                   display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  whiteSpace: "nowrap",
+                  justifyContent: "center",
                   animation: "fade-in 400ms var(--ease) both",
                 }}
               >
-                <Wave />
-                <span>regenerating your face</span>
+                <div
+                  style={{
+                    maxWidth: "100%",
+                    padding: "8px 12px",
+                    border: "1px solid var(--accent-line)",
+                    borderRadius: 4,
+                    background: "rgba(20, 16, 12, 0.85)",
+                    backdropFilter: "blur(6px)",
+                    color: "var(--ink)",
+                    fontFamily: "var(--mono)",
+                    fontSize: 10,
+                    letterSpacing: "0.16em",
+                    textTransform: "lowercase",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    minWidth: 0,
+                  }}
+                >
+                  <Wave />
+                  <span
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      minWidth: 0,
+                    }}
+                  >
+                    regenerating
+                  </span>
+                </div>
               </div>
             </div>
           )}
