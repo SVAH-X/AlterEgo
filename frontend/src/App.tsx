@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ComponentType } from "react";
 import { clamp } from "./atoms";
 import { simulateStream } from "./lib/api";
-import type { AgedPortrait, Profile, SimulationData, Trajectory } from "./types";
+import type { AgedPortrait, Profile, SimulationData } from "./types";
 import {
   ScreenIntake,
   ScreenLanding,
@@ -11,8 +11,7 @@ import {
 } from "./screens/screens-a";
 import {
   ScreenChat,
-  ScreenEncore,
-  ScreenSlider,
+  ScreenEnd,
   ScreenTimeline,
 } from "./screens/screens-b";
 import { ScreenSelfie } from "./screens/screen-selfie";
@@ -76,10 +75,9 @@ const SCREENS: ScreenDef[] = [
   { key: "intake", component: ScreenIntake, label: "03 intake" },
   { key: "processing", component: ScreenProcessing, label: "04 processing" },
   { key: "reveal", component: ScreenReveal, label: "05 reveal" },
-  { key: "chat", component: ScreenChat, label: "06 chat" },
-  { key: "timeline", component: ScreenTimeline, label: "07 timeline" },
-  { key: "slider", component: ScreenSlider, label: "08 slider" },
-  { key: "encore", component: ScreenEncore, label: "09 encore" },
+  { key: "timeline", component: ScreenTimeline, label: "06 timeline" },
+  { key: "chat", component: ScreenChat, label: "07 chat" },
+  { key: "end", component: ScreenEnd, label: "08 end" },
 ];
 
 const PRESENT_YEAR = new Date().getFullYear();
@@ -363,6 +361,3 @@ export default function App() {
     </div>
   );
 }
-
-// Re-export Trajectory so callers don't need to import from types.ts directly.
-export type { Trajectory };
