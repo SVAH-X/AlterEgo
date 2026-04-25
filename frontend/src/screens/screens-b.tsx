@@ -314,6 +314,7 @@ export function ScreenTimeline({
   setSimulation,
   timelineViewed,
   setTimelineViewed,
+  selfie,
 }: ScreenProps) {
   const checkpoints = simulation?.checkpointsHigh ?? AE_DATA.checkpointsHigh;
   const startYear = profile.presentYear || 2026;
@@ -447,7 +448,7 @@ export function ScreenTimeline({
     setAutoplay(false);
     setRewriting({ year: cp.year, fromIdx: idx, phase: "preparing", newCheckpoints: [] });
     try {
-      for await (const ev of simulateBranchStream(profile, cp.year, trimmed, originalSim)) {
+      for await (const ev of simulateBranchStream(profile, cp.year, trimmed, originalSim, selfie!)) {
         if (ev.phase === "counting") {
           setRewriting((r) =>
             r ? { ...r, phase: "redrafting the people in your life" } : null,

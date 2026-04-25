@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { ComponentType } from "react";
 import { clamp } from "./atoms";
 import { AE_DATA } from "./data";
-import type { Profile, SimulationData } from "./types";
+import { simulateStream } from "./lib/api";
+import type { AgedPortrait, Profile, SimulationData, Trajectory } from "./types";
 import {
   ScreenIntake,
   ScreenLanding,
@@ -15,6 +16,9 @@ import {
   ScreenSlider,
   ScreenTimeline,
 } from "./screens/screens-b";
+import { ScreenSelfie } from "./screens/screen-selfie";
+
+export type SimStreamPhase = "idle" | "streaming" | "complete" | "error";
 
 export interface ScreenProps {
   onContinue: () => void;
@@ -27,6 +31,13 @@ export interface ScreenProps {
   setSimulation: (s: SimulationData | null) => void;
   timelineViewed: boolean;
   setTimelineViewed: (v: boolean) => void;
+  selfie: Blob | null;
+  setSelfie: (s: Blob | null) => void;
+  simStreamPhase: SimStreamPhase;
+  portraitsDone: number;
+  mergePortrait: (p: AgedPortrait) => void;
+  runSimulate: () => void;
+  errorMessage: string | null;
 }
 
 interface ScreenDef {
@@ -37,28 +48,32 @@ interface ScreenDef {
 
 const SCREENS: ScreenDef[] = [
   { key: "landing", component: ScreenLanding, label: "01 cold open" },
-  { key: "intake", component: ScreenIntake, label: "02 intake" },
-  { key: "processing", component: ScreenProcessing, label: "03 processing" },
-  { key: "reveal", component: ScreenReveal, label: "04 reveal" },
-  { key: "chat", component: ScreenChat, label: "05 chat" },
-  { key: "timeline", component: ScreenTimeline, label: "06 timeline" },
-  { key: "slider", component: ScreenSlider, label: "07 slider" },
-  { key: "encore", component: ScreenEncore, label: "08 encore" },
+  { key: "selfie", component: ScreenSelfie, label: "02 selfie" },
+  { key: "intake", component: ScreenIntake, label: "03 intake" },
+  { key: "processing", component: ScreenProcessing, label: "04 processing" },
+  { key: "reveal", component: ScreenReveal, label: "05 reveal" },
+  { key: "chat", component: ScreenChat, label: "06 chat" },
+  { key: "timeline", component: ScreenTimeline, label: "07 timeline" },
+  { key: "slider", component: ScreenSlider, label: "08 slider" },
+  { key: "encore", component: ScreenEncore, label: "09 encore" },
 ];
 
 export default function App() {
   const [idx, setIdx] = useState(0);
   const [profile, setProfile] = useState<Profile>({ ...AE_DATA.profile });
   const [simulation, setSimulationState] = useState<SimulationData | null>(null);
-  // `timelineViewed` flips true when the user advances PAST the timeline screen
-  // (i.e., they've already watched the auto-play). On re-entry we skip replay
-  // and drop them at t=1 so they can directly intervene.
+  const [selfie, setSelfie] = useState<Blob | null>(null);
   const [timelineViewed, setTimelineViewed] = useState(false);
+  const [simStreamPhase, setSimStreamPhase] = useState<SimStreamPhase>("idle");
+  const [portraitsDone, setPortraitsDone] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Track an active stream so we don't fire two consumers concurrently.
+  const streamingRef = useRef(false);
 
   const go = (i: number) => setIdx(clamp(i, 0, SCREENS.length - 1));
   const next = () => {
     setIdx((i) => {
-      // Mark the timeline as viewed when leaving it forward.
       if (SCREENS[i].key === "timeline") setTimelineViewed(true);
       return clamp(i + 1, 0, SCREENS.length - 1);
     });
@@ -71,14 +86,68 @@ export default function App() {
   const restart = () => {
     setSimulationState(null);
     setTimelineViewed(false);
+    setSelfie(null);
+    setSimStreamPhase("idle");
+    setPortraitsDone(0);
+    setErrorMessage(null);
+    streamingRef.current = false;
     setIdx(0);
   };
-  // Wrap setSimulation so a freshly arrived simulation (post-intervention or
-  // first generation) resets the "viewed" flag — the user will want auto-play
-  // for the new trajectory.
+
+  // setSimulation is the user-facing setter that ALSO resets timelineViewed —
+  // used when a fresh simulation arrives (initial gen or post-intervention).
+  // For mid-stream portrait merges we use mergePortrait which does NOT reset.
   const setSimulation = (s: SimulationData | null) => {
     setSimulationState(s);
     setTimelineViewed(false);
+  };
+
+  // AMENDMENT A3: portrait merge that doesn't trip the timelineViewed reset.
+  const mergePortrait = (portrait: AgedPortrait) => {
+    setSimulationState((sim) => sim ? { ...sim, agedPortraits: [...sim.agedPortraits, portrait] } : sim);
+  };
+
+  // AMENDMENT A2: simulate stream consumer lives at App level so portraits
+  // continue arriving after the user advances past Processing.
+  const runSimulate = () => {
+    if (streamingRef.current) return; // guard against double-start
+    if (!selfie) {
+      setErrorMessage("Selfie required before simulate");
+      setSimStreamPhase("error");
+      return;
+    }
+    streamingRef.current = true;
+    setSimStreamPhase("streaming");
+    setPortraitsDone(0);
+    setErrorMessage(null);
+    (async () => {
+      try {
+        for await (const ev of simulateStream(profile, selfie)) {
+          if (ev.phase === "complete") {
+            // Use the raw setter so we don't double-reset timelineViewed; we
+            // explicitly reset it here in one shot.
+            setSimulationState(ev.simulation);
+            setTimelineViewed(false);
+            setSimStreamPhase("complete");
+          } else if (ev.phase === "portrait") {
+            setPortraitsDone((n) => n + 1);
+            mergePortrait(ev.portrait);
+          } else if (ev.phase === "portrait_error") {
+            setPortraitsDone((n) => n + 1);
+          } else if (ev.phase === "error") {
+            setErrorMessage(ev.message);
+            setSimStreamPhase("error");
+          }
+          // Other phases (counting, plan, event, finalizing) are observable
+          // by Processing if it wants — they're discarded here for now.
+        }
+      } catch (e) {
+        setErrorMessage(e instanceof Error ? e.message : String(e));
+        setSimStreamPhase("error");
+      } finally {
+        streamingRef.current = false;
+      }
+    })();
   };
 
   const idxRef = useRef(idx);
@@ -110,6 +179,13 @@ export default function App() {
           setSimulation={setSimulation}
           timelineViewed={timelineViewed}
           setTimelineViewed={setTimelineViewed}
+          selfie={selfie}
+          setSelfie={setSelfie}
+          simStreamPhase={simStreamPhase}
+          portraitsDone={portraitsDone}
+          mergePortrait={mergePortrait}
+          runSimulate={runSimulate}
+          errorMessage={errorMessage}
         />
       </div>
 
@@ -123,3 +199,6 @@ export default function App() {
     </div>
   );
 }
+
+// Re-export Trajectory so callers don't need to import from types.ts directly.
+export type { Trajectory };

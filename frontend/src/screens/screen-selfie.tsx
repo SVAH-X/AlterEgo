@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ScreenProps } from "../App";
 
-interface SelfieScreenProps extends ScreenProps {
-  selfie: Blob | null;
-  setSelfie: (s: Blob | null) => void;
-}
-
 type CaptureState =
   | { kind: "idle" }
   | { kind: "live"; stream: MediaStream }
@@ -13,7 +8,7 @@ type CaptureState =
 
 const MAX_EDGE = 1024;
 
-export function ScreenSelfie({ onContinue, onBack, selfie, setSelfie }: SelfieScreenProps) {
+export function ScreenSelfie({ onContinue, onBack, selfie, setSelfie }: ScreenProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [state, setState] = useState<CaptureState>(() =>
