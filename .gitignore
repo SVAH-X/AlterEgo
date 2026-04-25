@@ -47,3 +47,10 @@ trained_models/
 
 # Legacy — archived locally for reference only; not tracked
 legacy/
+
+# Local-only artifacts (not tracked in repo)
+AlterEgo Project Brief.md
+AlterEgo Project Brief.pdf
+docker-compose.yml
+Dockerfile
+pyproject.toml
