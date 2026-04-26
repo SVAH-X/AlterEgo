@@ -8,7 +8,7 @@ from app.services.voice import (
     VoiceError,
     clone_voice,
     delete_voice,
-    synthesize,
+    synthesize_primed,
     transcribe,
 )
 
@@ -34,7 +34,7 @@ async def tts(req: TTSRequest) -> StreamingResponse:
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="text is empty")
     try:
-        audio_iter = synthesize(req.text, voice_id=req.voice_id)
+        audio_iter = await synthesize_primed(req.text, voice_id=req.voice_id)
     except VoiceError as e:
         raise HTTPException(status_code=502, detail=str(e))
     return StreamingResponse(audio_iter, media_type="audio/mpeg")

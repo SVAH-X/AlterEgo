@@ -38,15 +38,40 @@ async def synthesize(text: str, voice_id: str | None = None) -> AsyncIterator[by
     to the built-in Bella sample.
     """
     client = _client()
-    stream = client.text_to_speech.stream(
-        voice_id=_resolve_voice_id(voice_id),
-        text=text,
-        model_id="eleven_turbo_v2_5",
-        output_format="mp3_44100_128",
-    )
-    async for chunk in stream:
-        if chunk:
+    resolved_voice_id = _resolve_voice_id(voice_id)
+    try:
+        stream = client.text_to_speech.stream(
+            voice_id=resolved_voice_id,
+            text=text,
+            model_id="eleven_turbo_v2_5",
+            output_format="mp3_44100_128",
+        )
+        async for chunk in stream:
+            if chunk:
+                yield chunk
+    except Exception as e:  # noqa: BLE001
+        raise VoiceError(f"text-to-speech failed: {e}") from e
+
+
+async def synthesize_primed(text: str, voice_id: str | None = None) -> AsyncIterator[bytes]:
+    """Return a TTS iterator that's guaranteed to have produced a first chunk.
+
+    StreamingResponse sends headers before consuming the iterator. Priming with
+    one chunk lets us surface provider/config errors as a regular 502 instead of
+    a misleading 200 with empty/truncated audio.
+    """
+    stream = synthesize(text, voice_id=voice_id)
+    try:
+        first_chunk = await anext(stream)
+    except StopAsyncIteration as e:
+        raise VoiceError("text-to-speech returned empty audio") from e
+
+    async def _with_first() -> AsyncIterator[bytes]:
+        yield first_chunk
+        async for chunk in stream:
             yield chunk
+
+    return _with_first()
 
 
 async def transcribe(audio: bytes, filename: str = "audio.webm") -> str:

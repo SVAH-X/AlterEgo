@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 
 from app.models import ChatRequest, ChatResponse
 from app.services.chat import ChatError, reply
-from app.services.voice import VoiceError, synthesize
+from app.services.voice import VoiceError, synthesize_primed
 
 router = APIRouter()
 
@@ -27,7 +27,7 @@ async def chat_voice(req: ChatRequest) -> StreamingResponse:
         raise HTTPException(status_code=502, detail=str(e))
 
     try:
-        audio_iter = synthesize(text, voice_id=req.voice_id)
+        audio_iter = await synthesize_primed(text, voice_id=req.voice_id)
     except VoiceError as e:
         raise HTTPException(status_code=502, detail=str(e))
 

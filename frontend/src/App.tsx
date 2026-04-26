@@ -119,8 +119,8 @@ export default function App() {
 
   // Audio Blobs collected from MicButton during intake. Held in a ref because
   // nothing in the render path consumes them — they sit here as the "port" for
-  // the future ElevenLabs voice-cloning pipeline (POST the concatenation to
-  // /elevenlabs/clone, persist voice_id on the profile).
+  // the future ElevenLabs voice-cloning pipeline (POST samples to /voice/clone,
+  // persist voice_id on the profile).
   const voiceSamplesRef = useRef<Blob[]>([]);
   const pushVoiceSample = (blob: Blob) => {
     voiceSamplesRef.current.push(blob);
@@ -325,7 +325,7 @@ export default function App() {
     errorMessage,
   };
 
-  const noop = () => {};
+  const noop = () => { };
   const leavingProps: ScreenProps = {
     ...screenProps,
     onContinue: noop,
