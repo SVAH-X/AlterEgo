@@ -286,6 +286,201 @@ function parseSpokenInteger(raw: string): number | null {
   return total + current;
 }
 
+type HealthFieldKey =
+  | "sleepHours"
+  | "exerciseDays"
+  | "caffeineCups"
+  | "alcoholDrinks"
+  | "stressLevel"
+  | "moodBaseline"
+  | "lonelinessFrequency";
+
+interface HealthRow {
+  key: HealthFieldKey;
+  label: string;
+  options: string[];
+  suffix?: string;
+}
+
+const HEALTH_BODY_ROWS: HealthRow[] = [
+  { key: "sleepHours", label: "Sleep per night", options: ["<5", "5-6", "6-7", "7-8", "8+"], suffix: "hrs" },
+  { key: "exerciseDays", label: "Exercise per week", options: ["0", "1-2", "3-4", "5+"], suffix: "days" },
+  { key: "caffeineCups", label: "Caffeine per day", options: ["0", "1", "2", "3", "4+"], suffix: "cups" },
+  { key: "alcoholDrinks", label: "Alcohol per week", options: ["0", "1-3", "4-7", "8-14", "15+"], suffix: "drinks" },
+];
+
+const HEALTH_MIND_ROWS: HealthRow[] = [
+  { key: "stressLevel", label: "Typical stress", options: ["low", "moderate", "high", "severe"] },
+  { key: "moodBaseline", label: "Mood, last month", options: ["mostly low", "mixed", "mostly steady", "mostly positive"] },
+  { key: "lonelinessFrequency", label: "Loneliness", options: ["rarely", "sometimes", "often"] },
+];
+
+function HealthButtonGroup({
+  row,
+  value,
+  onSelect,
+}: {
+  row: HealthRow;
+  value: string | null | undefined;
+  onSelect: (next: string | null) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "clamp(12px, 2vw, 20px)",
+        flexWrap: "wrap",
+      }}
+    >
+      <div
+        style={{
+          flex: "0 0 auto",
+          minWidth: 180,
+          fontFamily: "var(--mono)",
+          fontSize: 11,
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          color: "var(--ink-1)",
+        }}
+      >
+        {row.label}
+        {row.suffix ? <span style={{ opacity: 0.55 }}> ({row.suffix})</span> : null}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {row.options.map((opt) => {
+          const selected = value === opt;
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => onSelect(selected ? null : opt)}
+              style={{
+                padding: "8px 14px",
+                borderRadius: 999,
+                border: `1px solid ${selected ? "var(--accent)" : "var(--line-soft)"}`,
+                background: selected ? "var(--accent)" : "transparent",
+                color: selected ? "var(--bg-1)" : "var(--ink-0)",
+                fontFamily: "var(--mono)",
+                fontSize: 12,
+                letterSpacing: "0.05em",
+                cursor: "pointer",
+                transition: "all 200ms var(--ease)",
+              }}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function ScreenHealth({ onContinue, onJumpTo, profile, setProfile }: ScreenProps) {
+  const set = (key: HealthFieldKey, value: string | null) => {
+    setProfile({ ...profile, [key]: value });
+  };
+
+  return (
+    <div
+      style={{
+        height: "100%",
+        position: "relative",
+        overflow: "hidden",
+        animation: "fade-in 600ms var(--ease)",
+      }}
+    >
+      <div className="mark-anchor">
+        <Mark onClick={() => onJumpTo("landing")} />
+      </div>
+      <div
+        style={{
+          height: "100%",
+          overflowY: "auto",
+          overflowX: "hidden",
+        }}
+      >
+        <div
+          style={{
+            minHeight: "100%",
+            maxWidth: 720,
+            margin: "0 auto",
+            padding: "clamp(64px, 10vh, 120px) clamp(20px, 4vw, 48px) 140px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "clamp(28px, 4vh, 44px)",
+            boxSizing: "border-box",
+          }}
+        >
+          <div>
+            <h2
+              className="serif"
+              style={{
+                fontSize: "clamp(28px, 3.5vw, 40px)",
+                lineHeight: 1.15,
+                fontWeight: 400,
+                margin: 0,
+              }}
+            >
+              A little about your body and mind.
+            </h2>
+            <Meta style={{ marginTop: 12 }}>
+              All optional. Tap an answer to set it; tap again to clear.
+            </Meta>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <Meta style={{ color: "var(--accent)" }}>Body</Meta>
+            {HEALTH_BODY_ROWS.map((row) => (
+              <HealthButtonGroup
+                key={row.key}
+                row={row}
+                value={profile[row.key] as string | null | undefined}
+                onSelect={(next) => set(row.key, next)}
+              />
+            ))}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <Meta style={{ color: "var(--accent)" }}>Mind</Meta>
+            {HEALTH_MIND_ROWS.map((row) => (
+              <HealthButtonGroup
+                key={row.key}
+                row={row}
+                value={profile[row.key] as string | null | undefined}
+                onSelect={(next) => set(row.key, next)}
+              />
+            ))}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+            <button
+              type="button"
+              onClick={onContinue}
+              style={{
+                all: "unset",
+                cursor: "pointer",
+                fontFamily: "var(--mono)",
+                fontSize: 12,
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                color: "var(--accent)",
+                padding: "12px 18px",
+                border: "1px solid var(--accent)",
+                borderRadius: 999,
+                transition: "background 200ms var(--ease), color 200ms var(--ease)",
+              }}
+            >
+              continue →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVoiceSample }: ScreenProps) {
   const [step, setStep] = useState(0);
   const cur = INTAKE_FIELDS[step];
