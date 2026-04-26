@@ -22,7 +22,6 @@ def test_simulate_accepts_multipart_with_selfie() -> None:
             "profile": profile.model_dump(),
             "agedPortraits": [],
             "checkpointsHigh": [],
-            "checkpointsLow": [],
             "futureSelfOpening": "x",
             "futureSelfReplies": {},
         }}

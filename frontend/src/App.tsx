@@ -254,7 +254,7 @@ export default function App() {
             setSimStreamPhase("events");
           } else if (ev.phase === "finalizing") {
             setSimStreamPhase("finalizing");
-            setLatestTitle("weaving the threads — the alternate path, the voice");
+            setLatestTitle("weaving the threads — the voice");
           } else if (ev.phase === "complete") {
             setSimulationState(ev.simulation);
             setTimelineViewed(false);

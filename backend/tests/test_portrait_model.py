@@ -27,7 +27,6 @@ def test_simulation_data_accepts_aged_portraits() -> None:
             AgedPortrait(age=32, year=2026, trajectory="high", imageUrl=None),
         ],
         checkpointsHigh=[cp],
-        checkpointsLow=[cp],
         futureSelfOpening="hi",
         futureSelfReplies={"a": "b"},
     )
