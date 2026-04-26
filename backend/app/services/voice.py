@@ -16,6 +16,34 @@ _DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"  # ElevenLabs sample "Bella" — repl
 _STT_MODEL_ID = "scribe_v1"
 
 
+def _format_provider_error(prefix: str, e: Exception) -> str:
+    """Extract concise, actionable details from ElevenLabs SDK errors."""
+    status_code = getattr(e, "status_code", None)
+    body = getattr(e, "body", None)
+    message: str | None = None
+    status: str | None = None
+
+    if isinstance(body, dict):
+        detail = body.get("detail")
+        if isinstance(detail, dict):
+            status = detail.get("status")
+            message = detail.get("message")
+        elif isinstance(detail, str):
+            message = detail
+        elif isinstance(body.get("message"), str):
+            message = body.get("message")
+
+    if not message:
+        message = str(e)
+
+    suffix = ""
+    if status_code is not None:
+        suffix += f" ({status_code})"
+    if status:
+        suffix += f" [{status}]"
+    return f"{prefix}{suffix}: {message}"
+
+
 def _client() -> AsyncElevenLabs:
     settings = get_settings()
     if not settings.elevenlabs_api_key:
@@ -50,7 +78,7 @@ async def synthesize(text: str, voice_id: str | None = None) -> AsyncIterator[by
             if chunk:
                 yield chunk
     except Exception as e:  # noqa: BLE001
-        raise VoiceError(f"text-to-speech failed: {e}") from e
+        raise VoiceError(_format_provider_error("text-to-speech failed", e)) from e
 
 
 async def synthesize_primed(text: str, voice_id: str | None = None) -> AsyncIterator[bytes]:
@@ -75,7 +103,12 @@ async def synthesize_primed(text: str, voice_id: str | None = None) -> AsyncIter
 
 
 async def transcribe(audio: bytes, filename: str = "audio.webm") -> str:
-    """ElevenLabs Scribe — return transcribed text from the audio bytes."""
+    """ElevenLabs Scribe — return transcribed text from the audio bytes.
+
+    An empty transcription (silence, too-quiet audio, sub-second clip) is a
+    valid Scribe response, not an error — return "" so callers can decide
+    whether to ignore it. We only raise when the SDK itself fails.
+    """
     if not audio:
         raise VoiceError("empty audio payload")
     client = _client()
@@ -85,11 +118,8 @@ async def transcribe(audio: bytes, filename: str = "audio.webm") -> str:
             model_id=_STT_MODEL_ID,
         )
     except Exception as e:  # noqa: BLE001 — pass through as VoiceError
-        raise VoiceError(f"speech-to-text failed: {e}") from e
-    text = getattr(result, "text", None)
-    if not text:
-        raise VoiceError("speech-to-text returned no text")
-    return text
+        raise VoiceError(_format_provider_error("speech-to-text failed", e)) from e
+    return getattr(result, "text", None) or ""
 
 
 async def clone_voice(
@@ -115,7 +145,7 @@ async def clone_voice(
             files=files,
         )
     except Exception as e:  # noqa: BLE001
-        raise VoiceError(f"voice cloning failed: {e}") from e
+        raise VoiceError(_format_provider_error("voice cloning failed", e)) from e
     voice_id = getattr(voice, "voice_id", None)
     if not voice_id:
         raise VoiceError("voice cloning returned no voice_id")

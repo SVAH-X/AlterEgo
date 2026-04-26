@@ -1,5 +1,7 @@
 """Voice I/O endpoints: TTS, STT, and instant voice cloning."""
 
+import sys
+
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -49,6 +51,13 @@ async def stt(audio: UploadFile = File(...)) -> STTResponse:
     try:
         text = await transcribe(data, filename=audio.filename or "audio.webm")
     except VoiceError as e:
+        # Surface failures in the uvicorn terminal — FastAPI doesn't print
+        # HTTPException details to stderr, only the response body sees them.
+        print(
+            f"[stt] FAILED ({len(data)} bytes, filename={audio.filename!r}): {e}",
+            file=sys.stderr,
+            flush=True,
+        )
         raise HTTPException(status_code=502, detail=str(e))
     return STTResponse(text=text)
 

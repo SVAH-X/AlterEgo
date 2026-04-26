@@ -3,7 +3,6 @@ import {
   useCallback,
   useContext,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
@@ -39,9 +38,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   });
   const [primed, setPrimed] = useState(false);
   const [clonedVoiceId, setClonedVoiceId] = useState<string | null>(null);
-  const samplesRef = useRef<Blob[]>([]);
-  const [, bumpSamples] = useState(0);
-  const secondsRef = useRef(0);
+  const [intakeSamples, setIntakeSamples] = useState<Blob[]>([]);
+  const [intakeSamplesSeconds, setIntakeSamplesSeconds] = useState(0);
 
   const setVoiceMode = useCallback((v: boolean) => {
     setVoiceModeState(v);
@@ -55,18 +53,16 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const prime = useCallback(() => setPrimed(true), []);
 
   const pushIntakeSample = useCallback((b: Blob) => {
-    samplesRef.current.push(b);
-    bumpSamples((n) => n + 1);
+    setIntakeSamples((prev) => [...prev, b]);
   }, []);
 
   const clearIntakeSamples = useCallback(() => {
-    samplesRef.current = [];
-    secondsRef.current = 0;
-    bumpSamples((n) => n + 1);
+    setIntakeSamples([]);
+    setIntakeSamplesSeconds(0);
   }, []);
 
   const pushIntakeSeconds = useCallback((sec: number) => {
-    secondsRef.current += sec;
+    setIntakeSamplesSeconds((prev) => prev + sec);
   }, []);
 
   const value = useMemo<VoiceState>(
@@ -77,10 +73,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       prime,
       clonedVoiceId,
       setClonedVoiceId,
-      intakeSamples: samplesRef.current,
+      intakeSamples,
       pushIntakeSample,
       clearIntakeSamples,
-      intakeSamplesSeconds: secondsRef.current,
+      intakeSamplesSeconds,
       pushIntakeSeconds,
     }),
     [
@@ -89,8 +85,10 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       primed,
       prime,
       clonedVoiceId,
+      intakeSamples,
       pushIntakeSample,
       clearIntakeSamples,
+      intakeSamplesSeconds,
       pushIntakeSeconds,
     ],
   );

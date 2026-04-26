@@ -8,6 +8,7 @@ interface MicButtonProps {
   disabled?: boolean;
   size?: "sm" | "md";
   title?: string;
+  showStatus?: boolean;
 }
 
 /** Click to start, click again to stop. While recording, the ring
@@ -20,25 +21,31 @@ export function MicButton({
   disabled,
   size = "md",
   title = "Speak your answer",
+  showStatus = false,
 }: MicButtonProps) {
   const { recording, level, start, stop, permissionDenied } = useMicRecorder();
   const [pending, setPending] = useState(false);
   const startingRef = useRef(false);
+  const pointerHeldRef = useRef(false);
+  const hotkeyHeldRef = useRef(false);
+  const spaceDownRef = useRef(false);
+  const mDownRef = useRef(false);
 
-  const click = useCallback(async () => {
-    if (disabled || pending) return;
-    if (!recording) {
-      if (startingRef.current) return;
-      startingRef.current = true;
-      try {
-        await start();
-      } catch {
-        // permission denied or other; useMicRecorder records the flag
-      } finally {
-        startingRef.current = false;
-      }
-      return;
+  const startRecording = useCallback(async () => {
+    if (disabled || pending || recording) return;
+    if (startingRef.current) return;
+    startingRef.current = true;
+    try {
+      await start();
+    } catch {
+      // permission denied or other; useMicRecorder records the flag
+    } finally {
+      startingRef.current = false;
     }
+  }, [disabled, pending, recording, start]);
+
+  const stopRecording = useCallback(async () => {
+    if (!recording || pending) return;
     setPending(true);
     let result: { blob: Blob; durationMs: number } | null = null;
     try {
@@ -60,7 +67,49 @@ export function MicButton({
     } finally {
       setPending(false);
     }
-  }, [disabled, pending, recording, start, stop, onRecorded, onTranscript]);
+  }, [recording, pending, stop, onRecorded, onTranscript]);
+
+  useEffect(() => {
+    const bothDown = () => spaceDownRef.current && mDownRef.current;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "Space") spaceDownRef.current = true;
+      if (e.code === "KeyM") mDownRef.current = true;
+      if (bothDown() && !hotkeyHeldRef.current) {
+        hotkeyHeldRef.current = true;
+        e.preventDefault();
+        void startRecording();
+      }
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") spaceDownRef.current = false;
+      if (e.code === "KeyM") mDownRef.current = false;
+      if (hotkeyHeldRef.current && !bothDown()) {
+        hotkeyHeldRef.current = false;
+        e.preventDefault();
+        void stopRecording();
+      }
+    };
+
+    const onBlur = () => {
+      spaceDownRef.current = false;
+      mDownRef.current = false;
+      if (hotkeyHeldRef.current) {
+        hotkeyHeldRef.current = false;
+        void stopRecording();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [startRecording, stopRecording]);
 
   // glow size driven by mic level so the ring breathes with speech
   const glow = recording ? 0.4 + level * 0.6 : 0;
@@ -71,23 +120,58 @@ export function MicButton({
       ? "Transcribing"
       : title;
 
+  const statusText = permissionDenied
+    ? "Mic permission denied"
+    : pending
+      ? "Transcribing..."
+      : recording
+        ? "Listening..."
+        : "Hold button or Space+M";
+
   return (
-    <button
-      type="button"
-      onClick={click}
-      disabled={disabled || permissionDenied}
-      className={`mic-btn ${size} ${recording ? "rec" : ""} ${pending ? "pending" : ""}`}
-      title={permissionDenied ? "Microphone permission denied" : aria}
-      aria-label={aria}
-      style={
-        {
-          // CSS custom prop drives the live glow
-          ["--mic-glow" as string]: glow.toFixed(3),
-        } as React.CSSProperties
-      }
-    >
-      <MicIcon />
-    </button>
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+      <button
+        type="button"
+        onPointerDown={(e) => {
+          if (disabled || pending || permissionDenied) return;
+          pointerHeldRef.current = true;
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            /* ignore */
+          }
+          void startRecording();
+        }}
+        onPointerUp={() => {
+          if (!pointerHeldRef.current) return;
+          pointerHeldRef.current = false;
+          void stopRecording();
+        }}
+        onPointerCancel={() => {
+          if (!pointerHeldRef.current) return;
+          pointerHeldRef.current = false;
+          void stopRecording();
+        }}
+        onContextMenu={(e) => e.preventDefault()}
+        disabled={disabled || permissionDenied}
+        className={`mic-btn ${size} ${recording ? "rec" : ""} ${pending ? "pending" : ""}`}
+        title={permissionDenied ? "Microphone permission denied" : aria}
+        aria-label={aria}
+        style={
+          {
+            // CSS custom prop drives the live glow
+            ["--mic-glow" as string]: glow.toFixed(3),
+          } as React.CSSProperties
+        }
+      >
+        <MicIcon />
+      </button>
+      {showStatus && (
+        <span className="meta" style={{ color: "var(--ink-3)", fontSize: 10 }}>
+          {statusText}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -112,8 +196,8 @@ export function useReadyMic() {
   useEffect(() => {
     setReady(
       typeof navigator !== "undefined" &&
-        !!navigator.mediaDevices?.getUserMedia &&
-        typeof MediaRecorder !== "undefined",
+      !!navigator.mediaDevices?.getUserMedia &&
+      typeof MediaRecorder !== "undefined",
     );
   }, []);
   return ready;

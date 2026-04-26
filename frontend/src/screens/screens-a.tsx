@@ -213,11 +213,99 @@ function autoSizeTextarea(el: HTMLTextAreaElement | null) {
   el.style.height = `${el.scrollHeight}px`;
 }
 
+function normalizeCloneError(raw: string): string {
+  const withoutPrefix = raw.replace(/^\/voice\/clone\s+\d+:\s*/i, "");
+  try {
+    const parsed = JSON.parse(withoutPrefix) as { detail?: string };
+    if (typeof parsed.detail === "string" && parsed.detail.trim()) return parsed.detail;
+  } catch {
+    // keep raw text
+  }
+  return withoutPrefix;
+}
+
+function parseSpokenInteger(raw: string): number | null {
+  const digitMatch = raw.match(/-?\d+/);
+  if (digitMatch) return Number(digitMatch[0]);
+
+  const small: Record<string, number> = {
+    zero: 0,
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+    eleven: 11,
+    twelve: 12,
+    thirteen: 13,
+    fourteen: 14,
+    fifteen: 15,
+    sixteen: 16,
+    seventeen: 17,
+    eighteen: 18,
+    nineteen: 19,
+  };
+  const tens: Record<string, number> = {
+    twenty: 20,
+    thirty: 30,
+    forty: 40,
+    fifty: 50,
+    sixty: 60,
+    seventy: 70,
+    eighty: 80,
+    ninety: 90,
+  };
+
+  const tokens = raw
+    .toLowerCase()
+    .replace(/-/g, " ")
+    .replace(/[^a-z\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  let total = 0;
+  let current = 0;
+  let seen = false;
+
+  for (const token of tokens) {
+    if (token === "and" || token === "about" || token === "around") continue;
+    if (token in small) {
+      current += small[token];
+      seen = true;
+      continue;
+    }
+    if (token in tens) {
+      current += tens[token];
+      seen = true;
+      continue;
+    }
+    if (token === "hundred") {
+      current = (current || 1) * 100;
+      seen = true;
+      continue;
+    }
+    if (token === "thousand") {
+      total += (current || 1) * 1000;
+      current = 0;
+      seen = true;
+      continue;
+    }
+  }
+
+  if (!seen) return null;
+  return total + current;
+}
+
 export function ScreenIntake({ onContinue, profile, setProfile, pushVoiceSample }: ScreenProps) {
   const [step, setStep] = useState(0);
   const cur = INTAKE_FIELDS[step];
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const { voiceMode, pushIntakeSample, pushIntakeSeconds } = useVoice();
+  const { voiceMode, setVoiceMode, prime, pushIntakeSample, pushIntakeSeconds } = useVoice();
   const voicePrimed = useVoicePrimed();
   const tts = useTTSPlayer();
 
@@ -229,11 +317,11 @@ export function ScreenIntake({ onContinue, profile, setProfile, pushVoiceSample 
   }, [step, voiceMode, voicePrimed]);
 
   function onRecorded(blob: Blob, durationMs: number) {
-    // Open-ended fields make the best cloning samples.
-    if (cur.type === "textarea" || cur.type === "text") {
-      pushIntakeSample(blob);
-      pushIntakeSeconds(durationMs / 1000);
-    }
+    // Keep every clip so users can reach cloning threshold quickly.
+    prime();
+    if (!voiceMode) setVoiceMode(true);
+    pushIntakeSample(blob);
+    pushIntakeSeconds(durationMs / 1000);
   }
 
   function next() {
@@ -261,9 +349,9 @@ export function ScreenIntake({ onContinue, profile, setProfile, pushVoiceSample 
     }
     let n: number;
     if (source === "voice") {
-      const m = raw.match(/-?\d+/);
-      if (!m) return;
-      n = Number(m[0]);
+      const parsed = parseSpokenInteger(raw);
+      if (parsed === null) return;
+      n = parsed;
     } else {
       // Strip anything that isn't a digit so users can't paste
       // non-numeric content; empty string is allowed (clears field).
@@ -369,6 +457,7 @@ export function ScreenIntake({ onContinue, profile, setProfile, pushVoiceSample 
           )}
 
           <MicButton
+            showStatus
             onTranscript={(text) => applyValue(text, "voice")}
             onRecorded={(blob, durationMs) => {
               onRecorded(blob, durationMs);
@@ -454,28 +543,70 @@ export function ScreenProcessing({
   portraitsDone,
   runSimulate,
 }: ScreenProps) {
+  const CLONE_MIN_SECONDS = 5;
+  const CLONE_TIMEOUT_MS = 45_000;
   const [elapsedMs, setElapsedMs] = useState(0);
   const mountedAtRef = useRef(Date.now());
-  const { intakeSamples, intakeSamplesSeconds, setClonedVoiceId } = useVoice();
+  const {
+    intakeSamples,
+    intakeSamplesSeconds,
+    setClonedVoiceId,
+    clonedVoiceId,
+    voiceMode,
+    setVoiceMode,
+    prime,
+  } = useVoice();
+  const cloneStartedRef = useRef(false);
+  const [cloneState, setCloneState] = useState<
+    "idle" | "collecting" | "starting" | "success" | "error"
+  >("idle");
+  const [cloneMessage, setCloneMessage] = useState("No voice samples captured yet.");
 
   // Voice cloning runs in parallel with /simulate. Skip if no samples or
   // the audio is too short to produce a usable clone (~5s minimum).
   useEffect(() => {
-    if (intakeSamples.length === 0 || intakeSamplesSeconds < 5) return;
-    let cancelled = false;
+    if (cloneStartedRef.current) return;
+    if (intakeSamples.length === 0) {
+      setCloneState("idle");
+      setCloneMessage("No voice samples captured yet.");
+      return;
+    }
+    if (intakeSamplesSeconds < CLONE_MIN_SECONDS) {
+      const rem = Math.max(0, CLONE_MIN_SECONDS - intakeSamplesSeconds);
+      setCloneState("collecting");
+      setCloneMessage(`Need ~${rem.toFixed(1)}s more audio to start cloning.`);
+      return;
+    }
+    cloneStartedRef.current = true;
+    setCloneState("starting");
+    setCloneMessage("Enough audio captured. Starting voice clone...");
     (async () => {
+      const ac = new AbortController();
+      const timeoutId = window.setTimeout(() => ac.abort(), CLONE_TIMEOUT_MS);
       try {
-        const id = await cloneVoice(intakeSamples, `alterego-${Date.now()}`);
-        if (!cancelled) setClonedVoiceId(id);
+        const id = await cloneVoice([...intakeSamples], `alterego-${Date.now()}`, ac.signal);
+        setClonedVoiceId(id);
+        prime();
+        if (!voiceMode) setVoiceMode(true);
+        setCloneState("success");
+        setCloneMessage(`Clone ready (${id.slice(0, 8)}...).`);
       } catch (e) {
+        cloneStartedRef.current = false;
+        setCloneState("error");
+        const msg = e instanceof Error ? e.message : String(e);
+        const pretty = msg.includes("AbortError")
+          ? `voice clone timed out after ${Math.round(CLONE_TIMEOUT_MS / 1000)}s`
+          : normalizeCloneError(msg);
+        setCloneMessage(pretty.slice(0, 420));
         console.warn("voice clone failed:", e);
+      } finally {
+        clearTimeout(timeoutId);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [intakeSamples, intakeSamplesSeconds, setClonedVoiceId, voiceMode, setVoiceMode, prime]);
+
+  const cloneReady = intakeSamplesSeconds >= CLONE_MIN_SECONDS;
+  const cloneProgress = Math.min(1, intakeSamplesSeconds / CLONE_MIN_SECONDS);
 
   const startYear = profile.presentYear || 2026;
   const endYear = profile.targetYear || 2046;
@@ -758,6 +889,33 @@ export function ScreenProcessing({
         {simStreamPhase === "error"
           ? `${errorMessage?.slice(0, 80) ?? "stream interrupted"} · using sample`
           : `${totalEvents > 0 ? totalEvents : "—"} events · ${agentCount > 0 ? agentCount : "—"} people`}
+        <div
+          className="muted"
+          style={{
+            marginTop: 10,
+            padding: "10px 12px",
+            border: "1px solid var(--line-soft)",
+            background: "rgba(255, 255, 255, 0.03)",
+            borderRadius: 6,
+            textAlign: "left",
+            minWidth: 300,
+          }}
+        >
+          <div style={{ color: cloneReady ? "var(--accent)" : "var(--ink-2)" }}>
+            clone debug · {cloneReady ? "ready threshold reached" : "collecting audio"}
+          </div>
+          <div>
+            samples {intakeSamples.length} · audio {intakeSamplesSeconds.toFixed(1)}s / {CLONE_MIN_SECONDS.toFixed(1)}s ({Math.round(cloneProgress * 100)}%)
+          </div>
+          <div>
+            status {cloneState} · {cloneMessage}
+          </div>
+          {clonedVoiceId && (
+            <div>
+              voice id {clonedVoiceId.slice(0, 12)}...
+            </div>
+          )}
+        </div>
         {portraitsDone > 0 && (
           <div className="muted" style={{ fontSize: 12, fontFamily: "var(--mono)", marginTop: 8 }}>
             rendering portraits · {portraitsDone} / 10

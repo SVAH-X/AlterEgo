@@ -95,6 +95,18 @@ const EMPTY_PROFILE: Profile = {
 
 const TRANSITION_MS = 500;
 
+function humanizeSimError(message: string): string {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes("authenticationerror") ||
+    lower.includes("authentication_error") ||
+    lower.includes("invalid x-api-key")
+  ) {
+    return "Simulation auth failed (check ANTHROPIC_API_KEY).";
+  }
+  return message;
+}
+
 export default function App() {
   const { clonedVoiceId, setClonedVoiceId, clearIntakeSamples } = useVoice();
   const [idx, setIdx] = useState(0);
@@ -270,12 +282,13 @@ export default function App() {
           } else if (ev.phase === "portrait_error") {
             setPortraitsDone((n) => n + 1);
           } else if (ev.phase === "error") {
-            setErrorMessage(ev.message);
+            setErrorMessage(humanizeSimError(ev.message));
             setSimStreamPhase("error");
           }
         }
       } catch (e) {
-        setErrorMessage(e instanceof Error ? e.message : String(e));
+        const msg = e instanceof Error ? e.message : String(e);
+        setErrorMessage(humanizeSimError(msg));
         setSimStreamPhase("error");
       } finally {
         streamingRef.current = false;
