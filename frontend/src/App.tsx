@@ -10,6 +10,7 @@ import type {
   SimulationData,
 } from "./types";
 import {
+  ScreenHealth,
   ScreenIntake,
   ScreenLanding,
   ScreenProcessing,
@@ -88,11 +89,12 @@ const SCREENS: ScreenDef[] = [
   { key: "landing", component: ScreenLanding, label: "01 cold open" },
   { key: "selfie", component: ScreenSelfie, label: "02 selfie" },
   { key: "intake", component: ScreenIntake, label: "03 intake" },
-  { key: "processing", component: ScreenProcessing, label: "04 processing" },
-  { key: "reveal", component: ScreenReveal, label: "05 reveal" },
-  { key: "timeline", component: ScreenTimeline, label: "06 timeline" },
-  { key: "chat", component: ScreenChat, label: "07 chat" },
-  { key: "end", component: ScreenEnd, label: "08 end" },
+  { key: "health", component: ScreenHealth, label: "04 health" },
+  { key: "processing", component: ScreenProcessing, label: "05 processing" },
+  { key: "reveal", component: ScreenReveal, label: "06 reveal" },
+  { key: "timeline", component: ScreenTimeline, label: "07 timeline" },
+  { key: "chat", component: ScreenChat, label: "08 chat" },
+  { key: "end", component: ScreenEnd, label: "09 end" },
 ];
 
 const PRESENT_YEAR = new Date().getFullYear();
