@@ -102,7 +102,7 @@ type CornerPos = "tl" | "tr" | "bl" | "br";
 
 const CORNER_STYLES: Record<CornerPos, CSSProperties> = {
   tl: { top: 28, left: 32 },
-  tr: { top: 28, right: 32 },
+  tr: { top: 28, right: 132 },
   bl: { bottom: 28, left: 32 },
   br: { bottom: 28, right: 32 },
 };

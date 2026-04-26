@@ -105,6 +105,12 @@ export function ScreenSelfie({ onContinue, onBack, selfie, setSelfie, setSelfieU
     onContinue();
   }
 
+  function skip() {
+    setSelfieUploaded(false);
+    setSelfie(null);
+    onContinue();
+  }
+
   return (
     <div
       style={{
@@ -206,6 +212,14 @@ export function ScreenSelfie({ onContinue, onBack, selfie, setSelfie, setSelfieU
           </>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={skip}
+        className="btn btn-black"
+      >
+        skip · proceed without a photo →
+      </button>
 
       {/* Privacy notice */}
       <p

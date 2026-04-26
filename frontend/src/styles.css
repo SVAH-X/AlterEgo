@@ -100,6 +100,8 @@ body {
 .btn:hover { border-color: var(--ink-2); background: rgba(255,255,255,0.02); }
 .btn-accent { border-color: var(--accent-line); color: var(--accent); }
 .btn-accent:hover { border-color: var(--accent); background: var(--accent-soft); }
+.btn-black { border-color: var(--line); color: var(--ink-1); background: rgba(0,0,0,0.72); }
+.btn-black:hover { border-color: var(--accent-line); color: var(--accent); background: rgba(0,0,0,0.88); }
 
 /* link-style underline reveal */
 .under {
@@ -550,4 +552,3 @@ input[type="range"].fancy::-moz-range-thumb { width: 12px; height: 12px; border:
   border-color: var(--ink-3);
   animation: breathe 1.2s ease-in-out infinite;
 }
-
