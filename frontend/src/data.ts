@@ -88,7 +88,7 @@ export const AE_DATA: SimulationData = {
   ],
 
   futureSelfOpening:
-    "It's me. I know that's strange. I'm older than you remember being. I want to tell you that you're going to be fine — that's the thing people say — but I think you'd rather I told you what's actually here.",
+    "The years aren't the unit. The unit is what you stopped noticing.",
 
   futureSelfReplies: {
     "What did I get wrong?":
