@@ -308,3 +308,156 @@ export function AdvanceDock({
     </div>
   );
 }
+
+export interface ScrollEntryProps {
+  entry: ScrollEntry;
+  /** Recency rank: 0 for the active entry, 1 for the one above, etc. */
+  rank: number;
+  age: number | null;
+  now: number;
+}
+
+const RECENCY_OPACITY = [1.0, 0.55, 0.35, 0.25];
+
+export function ScrollEntryView({ entry, rank, age, now }: ScrollEntryProps) {
+  const isActive = rank === 0;
+  const opacity =
+    RECENCY_OPACITY[Math.min(rank, RECENCY_OPACITY.length - 1)];
+
+  // Only the active entry reveals bubbles; older entries collapse to title.
+  const visibleBubbles = isActive
+    ? entry.bubbles.filter(
+        (_, i) => now - entry.revealStartedAt >= i * BUBBLE_STAGGER_MS,
+      )
+    : [];
+
+  const sinceMount = now - entry.revealStartedAt;
+  const enterAlpha = Math.max(0, Math.min(1, sinceMount / ENTRY_FADE_MS));
+  const enterShift = (1 - enterAlpha) * 14; // px translateY from below
+
+  return (
+    <div
+      style={{
+        opacity: opacity * (isActive ? enterAlpha : 1),
+        transform: isActive ? `translateY(${enterShift}px)` : undefined,
+        transition: isActive
+          ? undefined
+          : "opacity 600ms var(--ease)",
+        display: "flex",
+        flexDirection: "column",
+        gap: isActive ? 14 : 4,
+        paddingBottom: isActive ? 0 : 6,
+      }}
+    >
+      <div>
+        <div
+          className="mono"
+          style={{
+            fontSize: isActive ? 11 : 10,
+            letterSpacing: "0.22em",
+            color: isActive ? "var(--accent)" : "var(--ink-3)",
+            textTransform: "uppercase",
+            marginBottom: 6,
+          }}
+        >
+          {entry.checkpoint.year}
+          {age !== null ? ` · age ${age}` : ""}
+        </div>
+        <div
+          className="serif"
+          style={{
+            fontSize: isActive ? 22 : 16,
+            fontStyle: "italic",
+            lineHeight: 1.3,
+            color: isActive ? "var(--ink)" : "var(--ink-1)",
+          }}
+        >
+          {entry.checkpoint.title || entry.bubbles[0]?.line}
+        </div>
+      </div>
+
+      {visibleBubbles.map((b, j) => (
+        <div
+          key={`${entry.outlineIdx}-${j}`}
+          style={{ animation: "fade-in 600ms var(--ease) both" }}
+        >
+          <div
+            className="mono"
+            style={{
+              fontSize: 10,
+              letterSpacing: "0.22em",
+              color: b.who === "narrator" ? "var(--ink-2)" : "var(--accent)",
+              textTransform: "uppercase",
+              marginBottom: 4,
+            }}
+          >
+            {b.who === "narrator" ? "—" : b.who}
+          </div>
+          <div
+            className="serif"
+            style={{
+              fontSize: b.who === "narrator" ? 17 : 18,
+              lineHeight: b.who === "narrator" ? 1.55 : 1.5,
+              color: b.who === "narrator" ? "var(--ink-1)" : "var(--ink)",
+              fontStyle: b.who === "narrator" ? "italic" : "normal",
+              letterSpacing: "0.003em",
+            }}
+          >
+            {b.who === "narrator" ? b.line : `“${b.line}”`}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export interface StoryScrollProps {
+  visible: ScrollEntry[];
+  now: number;
+}
+
+/**
+ * StoryScroll
+ * Bottom-anchored: latest entry sits at the bottom; older entries push up.
+ * Top edge is masked so older overflow fades into the background.
+ */
+export function StoryScroll({ visible, now }: StoryScrollProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll the active entry into view at the bottom.
+  useEffect(() => {
+    if (!containerRef.current) return;
+    containerRef.current.scrollTop = containerRef.current.scrollHeight;
+  }, [visible.length]);
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        flex: 1,
+        minHeight: 0,
+        overflowY: "auto",
+        display: "flex",
+        flexDirection: "column",
+        gap: 28,
+        paddingTop: 28,
+        paddingBottom: 4,
+        WebkitMaskImage:
+          "linear-gradient(to bottom, transparent 0, #000 56px, #000 100%)",
+        maskImage:
+          "linear-gradient(to bottom, transparent 0, #000 56px, #000 100%)",
+        scrollbarWidth: "none",
+      }}
+    >
+      {visible.map((entry, i) => (
+        <ScrollEntryView
+          key={entry.outlineIdx}
+          entry={entry}
+          rank={visible.length - 1 - i}
+          age={entry.checkpoint.age}
+          now={now}
+        />
+      ))}
+    </div>
+  );
+}
