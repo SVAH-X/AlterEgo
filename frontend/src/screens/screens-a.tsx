@@ -197,7 +197,7 @@ const INTAKE_FIELDS: IntakeField[] = [
   },
   {
     key: "topFear",
-    label: "What are you afraid of?",
+    label: "What are you most afraid of?",
     placeholder: "Looking up at fifty and realizing I optimized for the wrong thing",
     type: "textarea",
   },
@@ -205,11 +205,11 @@ const INTAKE_FIELDS: IntakeField[] = [
     key: "mbti",
     label: "Your MBTI, if you know it.",
     type: "mbti",
-    suffix: "Skip if you don't. It's optional — a hint, not a label.",
+    suffix: "Skip if you don't. It's optional. Just a hint, not a label.",
   },
   {
     key: "values",
-    label: "Pick one in each pair. There's no right answer — just yours.",
+    label: "Pick one in each pair, there's no right answer.",
     type: "dyads",
     dyads: VALUES_DYADS,
   },
@@ -593,7 +593,7 @@ const PHASE_LABELS: Record<SimStreamPhase, string> = {
   events: "writing the moments",
   finalizing: "stitching it together",
   complete: "ready",
-  error: "the simulation faltered",
+  error: "the simulation failed",
 };
 
 export function ScreenProcessing({
