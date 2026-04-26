@@ -92,7 +92,7 @@ Profile:
 - work hours per week: {profile.workHours}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
-- target year: {profile.targetYear} (present year: {profile.presentYear}){_mbti_block(profile)}{_values_block(profile)}
+- target year: {profile.targetYear} (present year: {profile.presentYear}){_mbti_block(profile)}{_values_block(profile)}{_health_block(profile)}
 
 Output the agent list as strict JSON only."""
 
@@ -217,7 +217,7 @@ def render_branched_planning_user(
     )
     return f"""\
 Profile:
-- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}
+- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}{_health_block(profile)}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
 - horizon: {profile.presentYear} to {profile.targetYear}
@@ -348,7 +348,7 @@ still happen on their own timing. They just land differently on a \
 person making a different choice."""
     return f"""\
 Profile:
-- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}
+- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}{_health_block(profile)}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
 - horizon: {profile.presentYear} to {profile.targetYear} ({profile.targetYear - profile.presentYear} years)
@@ -455,7 +455,7 @@ def render_detail_user(
     )
     return f"""\
 Profile:
-- {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}
+- {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}{_health_block(profile)}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
 
@@ -528,7 +528,7 @@ def render_finalize_user(
 Profile:
 - {profile.name}, age {profile.age} → {profile.targetYear}
 - top goal at start: {profile.topGoal}
-- top fear at start: {profile.topFear}
+- top fear at start: {profile.topFear}{_health_block(profile)}
 
 Lived trajectory:
 {cps}
@@ -590,3 +590,58 @@ def _values_block(profile: Profile) -> str:
     if not parts:
         return ""
     return "\n- values (forced-choice): leans " + ", ".join(parts)
+
+
+# Display labels for each health field. Keys mirror the Profile bucket strings
+# (so the block reads back what the user actually picked, not a re-encoded
+# version). Two-section layout: Body / Mind. Body or Mind subhead is omitted
+# when none of its fields are set.
+
+_HEALTH_BODY_LABELS: list[tuple[str, str, str]] = [
+    # (Profile attribute, prefix shown to the model, suffix unit)
+    ("sleepHours", "Sleep", "hrs/night"),
+    ("exerciseDays", "Exercise", "days/week"),
+    ("caffeineCups", "Caffeine", "cups/day"),
+    ("alcoholDrinks", "Alcohol", "drinks/week"),
+]
+
+_HEALTH_MIND_LABELS: list[tuple[str, str, str]] = [
+    ("stressLevel", "Stress", ""),
+    ("moodBaseline", "Mood", ""),
+    ("lonelinessFrequency", "Loneliness", ""),
+]
+
+
+def _health_block(profile: Profile) -> str:
+    """Return a formatted block of health-intake answers, or '' if nothing set.
+
+    Empty string when all seven fields are None — keeps prompts byte-identical
+    to the pre-feature world. Otherwise returns a leading-newline block that
+    inline-appends after the work-hours bullet, just like _mbti_block.
+    """
+
+    def _section(items: list[tuple[str, str, str]]) -> list[str]:
+        lines: list[str] = []
+        for attr, prefix, suffix in items:
+            val = getattr(profile, attr, None)
+            if val is None:
+                continue
+            line = f"  - {prefix}: {val}"
+            if suffix:
+                line += f" {suffix}"
+            lines.append(line)
+        return lines
+
+    body_lines = _section(_HEALTH_BODY_LABELS)
+    mind_lines = _section(_HEALTH_MIND_LABELS)
+    if not body_lines and not mind_lines:
+        return ""
+
+    out = ["\nHealth background:"]
+    if body_lines:
+        out.append("  Body:")
+        out.extend(body_lines)
+    if mind_lines:
+        out.append("  Mind:")
+        out.extend(mind_lines)
+    return "\n".join(out)
