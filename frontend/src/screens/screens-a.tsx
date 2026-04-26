@@ -385,13 +385,15 @@ export function ScreenHealth({ onContinue, onJumpTo, profile, setProfile }: Scre
   const { voiceMode } = useVoice();
   const voicePrimed = useVoicePrimed();
   const tts = useTTSPlayer();
+  const playedRef = useRef(false);
   useEffect(() => {
+    if (playedRef.current) return;
     if (voiceMode && voicePrimed) {
+      playedRef.current = true;
       tts.play("A few quick health questions. Tap your answers.");
     }
     return () => tts.stop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [voiceMode, voicePrimed, tts]);
 
   return (
     <div
@@ -599,16 +601,15 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
     setForceTypedField(false);
   }, [step]);
 
-  // Typed-mode TTS: read the label aloud (existing behavior preserved).
   useEffect(() => {
-    if (inputMode === "voice") return; // voice mode owns its own TTS via runTurn
+    if (inputMode === "voice") return;
     if (voiceMode && voicePrimed) tts.play(cur.label);
     else tts.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, voiceMode, voicePrimed, inputMode]);
 
-  // Voice-mode driver: run one turn per step; on success, applyValue + next().
-  // For non-speech fields (mbti/dyads), read the label via TTS but don't listen.
+  // Voice-mode driver: one turn per step. Do NOT add forceTypedField to deps —
+  // it would re-fire turn.abort() and start a fresh turn after fallback.
   useEffect(() => {
     if (inputMode !== "voice") return;
     let cancelled = false;
@@ -623,7 +624,7 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
       if (result.blob) {
         pushVoiceSample(result.blob);
         pushIntakeSample(result.blob);
-        pushIntakeSeconds(result.blob.size / 16000); // rough; size-based estimate
+        pushIntakeSeconds(result.durationMs / 1000);
         prime();
       }
       if (result.fellBack) {
@@ -632,10 +633,7 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
       }
       if (result.transcript) {
         applyValue(result.transcript, "voice");
-        // Wait one tick so React commits the new value before advancing.
-        setTimeout(() => {
-          if (!cancelled) advance();
-        }, 50);
+        advance();
       }
     })();
 
@@ -890,6 +888,26 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
   );
 }
 
+const VOICE_STATUS_TEXT: Record<import("../voice/useVoiceTurn").TurnState, string> = {
+  idle: "",
+  speaking: "asking…",
+  listening: "listening…",
+  transcribing: "transcribing…",
+  reprompting: "one more time…",
+  showing: "got it",
+  fallback: "let's type this one",
+};
+
+const VOICE_RING_BG: Record<import("../voice/useVoiceTurn").TurnState, string> = {
+  idle: "var(--bg-3)",
+  speaking: "var(--ink-1)",
+  reprompting: "var(--ink-1)",
+  listening: "var(--accent)",
+  transcribing: "var(--bg-3)",
+  showing: "var(--bg-3)",
+  fallback: "var(--bg-3)",
+};
+
 function VoiceFieldDisplay({
   state,
   level,
@@ -900,20 +918,6 @@ function VoiceFieldDisplay({
   transcript: string;
 }) {
   const ringScale = 1 + Math.min(level, 1) * 0.5;
-  const statusText =
-    state === "speaking"
-      ? "asking…"
-      : state === "listening"
-        ? "listening…"
-        : state === "transcribing"
-          ? "transcribing…"
-          : state === "reprompting"
-            ? "one more time…"
-            : state === "showing"
-              ? "got it"
-              : state === "fallback"
-                ? "let's type this one"
-                : "";
 
   return (
     <div
@@ -930,12 +934,7 @@ function VoiceFieldDisplay({
           width: 96,
           height: 96,
           borderRadius: "50%",
-          background:
-            state === "listening"
-              ? "var(--accent)"
-              : state === "speaking" || state === "reprompting"
-                ? "var(--ink-1)"
-                : "var(--bg-3)",
+          background: VOICE_RING_BG[state],
           transform: `scale(${ringScale.toFixed(3)})`,
           transition: "transform 80ms linear, background 200ms var(--ease)",
           opacity: state === "idle" ? 0.3 : 1,
@@ -952,7 +951,7 @@ function VoiceFieldDisplay({
           minHeight: 14,
         }}
       >
-        {statusText}
+        {VOICE_STATUS_TEXT[state]}
       </div>
       <div
         className="serif"

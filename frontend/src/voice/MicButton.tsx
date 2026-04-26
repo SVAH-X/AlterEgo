@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { stt } from "../lib/voice";
+import { transcribe } from "../lib/voice";
 import { useMicRecorder } from "./useMicRecorder";
 
 interface MicButtonProps {
@@ -59,14 +59,9 @@ export function MicButton({
       return;
     }
     onRecorded?.(result.blob, result.durationMs);
-    try {
-      const text = await stt(result.blob);
-      if (text.trim()) onTranscript(text.trim());
-    } catch (e) {
-      console.warn("stt failed:", e);
-    } finally {
-      setPending(false);
-    }
+    const text = await transcribe(result.blob);
+    if (text) onTranscript(text);
+    setPending(false);
   }, [recording, pending, stop, onRecorded, onTranscript]);
 
   useEffect(() => {

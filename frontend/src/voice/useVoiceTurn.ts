@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { stt } from "../lib/voice";
+import { transcribe } from "../lib/voice";
 import { useAutoListen } from "./useAutoListen";
 import { useTTSPlayer } from "./useTTSPlayer";
 
@@ -15,6 +15,7 @@ export type TurnState =
 export interface TurnResult {
   transcript: string | null;
   blob: Blob | null;
+  durationMs: number;
   /** True when the turn ended without producing a usable transcript (after reprompt). */
   fellBack: boolean;
 }
@@ -33,6 +34,7 @@ interface VoiceTurn {
 }
 
 const DEFAULT_REPROMPT = "Sorry, I didn't catch that. Could you say it again?";
+const SHOWING_HOLD_MS = 800;
 
 export function useVoiceTurn(): VoiceTurn {
   const tts = useTTSPlayer();
@@ -59,29 +61,25 @@ export function useVoiceTurn(): VoiceTurn {
       const tryOnce = async (): Promise<{
         transcript: string | null;
         blob: Blob | null;
+        durationMs: number;
       }> => {
-        if (abortedRef.current) return { transcript: null, blob: null };
+        if (abortedRef.current) return { transcript: null, blob: null, durationMs: 0 };
         setState("listening");
         const heard = await listener.listen();
-        if (abortedRef.current) return { transcript: null, blob: null };
+        if (abortedRef.current) return { transcript: null, blob: null, durationMs: 0 };
         if (!heard.blob || heard.reason === "no-speech" || heard.reason === "denied") {
-          return { transcript: null, blob: heard.blob };
+          return { transcript: null, blob: heard.blob, durationMs: heard.durationMs };
         }
         setState("transcribing");
-        try {
-          const text = await stt(heard.blob);
-          return { transcript: text.trim() || null, blob: heard.blob };
-        } catch (e) {
-          console.warn("stt failed:", e);
-          return { transcript: null, blob: heard.blob };
-        }
+        const transcript = await transcribe(heard.blob);
+        return { transcript, blob: heard.blob, durationMs: heard.durationMs };
       };
 
       setState("speaking");
       await tts.playAndWait(promptText);
       if (abortedRef.current) {
         setState("idle");
-        return { transcript: null, blob: null, fellBack: true };
+        return { transcript: null, blob: null, durationMs: 0, fellBack: true };
       }
 
       let attempt = await tryOnce();
@@ -90,21 +88,21 @@ export function useVoiceTurn(): VoiceTurn {
         await tts.playAndWait(options?.reprompt ?? DEFAULT_REPROMPT);
         if (abortedRef.current) {
           setState("idle");
-          return { transcript: null, blob: null, fellBack: true };
+          return { transcript: null, blob: null, durationMs: 0, fellBack: true };
         }
         attempt = await tryOnce();
       }
 
       if (!attempt.transcript) {
         setState("fallback");
-        return { transcript: null, blob: attempt.blob, fellBack: true };
+        return { transcript: null, blob: attempt.blob, durationMs: attempt.durationMs, fellBack: true };
       }
 
       setLiveTranscript(attempt.transcript);
       setState("showing");
-      await new Promise((r) => setTimeout(r, 800));
+      await new Promise((r) => setTimeout(r, SHOWING_HOLD_MS));
       setState("idle");
-      return { transcript: attempt.transcript, blob: attempt.blob, fellBack: false };
+      return { transcript: attempt.transcript, blob: attempt.blob, durationMs: attempt.durationMs, fellBack: false };
     },
     [tts, listener],
   );
