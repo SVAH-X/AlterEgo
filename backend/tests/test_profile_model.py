@@ -80,3 +80,64 @@ def test_profile_mbti_still_optional() -> None:
     assert p.mbti == "INTJ"
     p2 = Profile(**_base_profile_kwargs(), mbti="not-a-type")
     assert p2.mbti is None  # invalid input normalizes to None
+
+
+def test_profile_accepts_valid_health_fields() -> None:
+    p = Profile(
+        **_base_profile_kwargs(),
+        sleepHours="6-7",
+        exerciseDays="3-4",
+        caffeineCups="2",
+        alcoholDrinks="1-3",
+        stressLevel="high",
+        moodBaseline="mixed",
+        lonelinessFrequency="sometimes",
+    )
+    assert p.sleepHours == "6-7"
+    assert p.exerciseDays == "3-4"
+    assert p.caffeineCups == "2"
+    assert p.alcoholDrinks == "1-3"
+    assert p.stressLevel == "high"
+    assert p.moodBaseline == "mixed"
+    assert p.lonelinessFrequency == "sometimes"
+
+
+def test_profile_health_fields_default_none() -> None:
+    p = Profile(**_base_profile_kwargs())
+    assert p.sleepHours is None
+    assert p.exerciseDays is None
+    assert p.caffeineCups is None
+    assert p.alcoholDrinks is None
+    assert p.stressLevel is None
+    assert p.moodBaseline is None
+    assert p.lonelinessFrequency is None
+
+
+def test_profile_drops_invalid_health_field_values() -> None:
+    p = Profile(
+        **_base_profile_kwargs(),
+        sleepHours="forever",     # bogus
+        exerciseDays="3-4",       # valid
+        caffeineCups="seventeen", # bogus
+        stressLevel="meh",        # bogus
+        moodBaseline="mostly steady",  # valid
+        lonelinessFrequency="always",  # bogus
+    )
+    assert p.sleepHours is None
+    assert p.exerciseDays == "3-4"
+    assert p.caffeineCups is None
+    assert p.stressLevel is None
+    assert p.moodBaseline == "mostly steady"
+    assert p.lonelinessFrequency is None
+
+
+def test_profile_health_fields_drop_non_string() -> None:
+    p = Profile(
+        **_base_profile_kwargs(),
+        sleepHours=7,        # not a string
+        exerciseDays=None,
+        stressLevel=False,
+    )
+    assert p.sleepHours is None
+    assert p.exerciseDays is None
+    assert p.stressLevel is None
