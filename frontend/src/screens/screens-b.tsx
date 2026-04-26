@@ -4,6 +4,7 @@ import { Mark, Meta, PortraitImage, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
 import { chat, simulateBranchStream } from "../lib/api";
 import { nearestPortrait } from "../lib/portraits";
+import { ClinicalCard } from "./screens-a";
 import type { Checkpoint, Tone } from "../types";
 import { useVoice, useVoicePrimed } from "../voice/VoiceContext";
 import { useTTSPlayer } from "../voice/useTTSPlayer";
@@ -125,7 +126,7 @@ export function ScreenChat({ onContinue, onJumpTo, profile, simulation }: Screen
       style={{
         height: "100%",
         display: "grid",
-        gridTemplateColumns: "minmax(280px, 380px) 1fr",
+        gridTemplateColumns: "minmax(420px, 520px) 1fr",
         position: "relative",
       }}
     >
@@ -142,7 +143,7 @@ export function ScreenChat({ onContinue, onJumpTo, profile, simulation }: Screen
           gap: 24,
         }}
       >
-        <div style={{ width: "100%", height: 420, flexShrink: 0, maxWidth: 320 }}>
+        <div style={{ width: "100%", height: 420, flexShrink: 0, maxWidth: 400 }}>
           {(() => {
             const p = nearestPortrait(simulation?.agedPortraits, "high", profile.targetYear);
             return <PortraitImage src={p?.imageUrl} alt={p ? `you at ${p.age}` : "you"} />;
@@ -512,7 +513,7 @@ export function ScreenTimeline({
         height: "100%",
         position: "relative",
         display: "grid",
-        gridTemplateColumns: "minmax(320px, 420px) 1fr",
+        gridTemplateColumns: "minmax(420px, 520px) 1fr",
         overflow: "hidden",
       }}
     >
@@ -566,7 +567,7 @@ export function ScreenTimeline({
             width: "100%",
             height: "min(58vh, 480px)",
             flexShrink: 0,
-            maxWidth: 360,
+            maxWidth: 400,
             transition: "filter 600ms var(--ease)",
             position: "relative",
           }}
@@ -1201,16 +1202,36 @@ export function ScreenEnd({ onRestart, onJumpTo, profile, simulation }: ScreenPr
           flexDirection: "column",
           alignItems: "center",
           gap: 32,
-          maxWidth: 720,
+          maxWidth: 1200,
           textAlign: "center",
           animation: "fade-in 1200ms var(--ease) both",
         }}
       >
-        <div style={{ width: "min(360px, 32vw)", height: "min(50vh, 460px)" }}>
-          {(() => {
-            const p = nearestPortrait(simulation?.agedPortraits, "high", endYear);
-            return <PortraitImage src={p?.imageUrl} alt={p ? `you at ${p.age}` : "you"} />;
-          })()}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 56,
+            width: "100%",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ width: "min(360px, 32vw)", height: "min(50vh, 460px)", flexShrink: 0 }}>
+            {(() => {
+              const p = nearestPortrait(simulation?.agedPortraits, "high", endYear);
+              return <PortraitImage src={p?.imageUrl} alt={p ? `you at ${p.age}` : "you"} />;
+            })()}
+          </div>
+
+          {simulation?.clinicalSummary ? (
+            <ClinicalCard
+              summary={simulation.clinicalSummary}
+              visible={true}
+              size="lg"
+            />
+          ) : null}
         </div>
 
         <Meta>

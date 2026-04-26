@@ -481,33 +481,37 @@ export function ScreenHealth({ onContinue, onJumpTo, profile, setProfile }: Scre
   );
 }
 
-function ClinicalCard({
+export function ClinicalCard({
   summary,
   visible,
+  size = "default",
 }: {
   summary: ClinicalSummary;
   visible: boolean;
+  size?: "default" | "lg";
 }) {
   const stateColor: Record<string, string> = {
     stable: "var(--good)",
     strained: "var(--accent)",
     critical: "var(--warn)",
   };
+  const isLg = size === "lg";
   return (
     <div
       style={{
         opacity: visible ? 1 : 0,
         transition: "opacity 1600ms var(--ease)",
-        maxWidth: 360,
+        maxWidth: isLg ? 520 : 360,
         width: "100%",
         boxSizing: "border-box",
-        padding: "24px 26px",
+        padding: isLg ? "32px 36px" : "24px 26px",
         borderTop: `1px solid ${stateColor[summary.finalHealthState]}`,
         borderBottom: `1px solid var(--line-soft)`,
         display: "flex",
         flexDirection: "column",
-        gap: 16,
+        gap: isLg ? 22 : 16,
         background: "rgba(255,255,255,0.015)",
+        textAlign: "left",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -523,18 +527,28 @@ function ClinicalCard({
           margin: 0,
           display: "flex",
           flexDirection: "column",
-          gap: 14,
+          gap: isLg ? 18 : 14,
         }}
       >
         {summary.riskFactors.map((rf, i) => (
-          <li key={i} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <li key={i} style={{ display: "flex", flexDirection: "column", gap: isLg ? 6 : 4 }}>
             <span
               className="serif"
-              style={{ fontSize: 17, lineHeight: 1.3, fontStyle: "italic" }}
+              style={{
+                fontSize: isLg ? 22 : 17,
+                lineHeight: 1.3,
+                fontStyle: "italic",
+              }}
             >
               {rf.label}
             </span>
-            <span style={{ fontSize: 13, lineHeight: 1.5, color: "var(--ink-1)" }}>
+            <span
+              style={{
+                fontSize: isLg ? 15 : 13,
+                lineHeight: 1.55,
+                color: "var(--ink-1)",
+              }}
+            >
               {rf.consequence}
             </span>
           </li>
@@ -1065,16 +1079,16 @@ export function ScreenProcessing({
   }, []);
 
   const phase = PHASE_TO_STEP[simStreamPhase] ?? 1;
-  // Server phase (`phase`) always advances with the stream. `displayedPhase` is
-  // gated by user advancement: we don't move the right-column UI from phase 1
-  // to phase 2 (or 2 → 3) until the user has acknowledged the gate. Phase 4
-  // (finalizing) is always allowed to display whenever the server reaches it,
-  // because the queue/dock already handles 3 → 4 advancement explicitly.
-  const displayedPhase =
-    phase >= 4
-      ? phase
-      : Math.min(phase, Math.max(1, userUnlockedPhase + 1));
   const isError = simStreamPhase === "error";
+
+  // Fast-forward overrides: when the user presses advance during the staggered
+  // arrival/reveal animations, we collapse the timing locally so they don't
+  // have to wait. The originals (agentArrivedAt, planArrivedAt) are owned by
+  // App.tsx and only set once per stream, so overriding locally is safe.
+  const [arrivalOverride, setArrivalOverride] = useState<Record<string, number> | null>(null);
+  const [planRevealOverride, setPlanRevealOverride] = useState<number | null>(null);
+  const effectiveArrived = arrivalOverride ?? agentArrivedAt;
+  const effectivePlanArrivedAt = planRevealOverride ?? planArrivedAt;
   const startYear = profile.presentYear || 2026;
   const endYear = profile.targetYear || 2046;
 
@@ -1122,10 +1136,23 @@ export function ScreenProcessing({
   // still plays immediately).
   const svgActiveIdx = pacedActiveIdx >= 0 ? pacedActiveIdx : activeIdx;
   const svgActive = svgActiveIdx >= 0 ? outline[svgActiveIdx] : active;
+
+  // displayedPhase gates the right-column UI: we don't move it from phase 1 → 2
+  // or 2 → 3 until the user acknowledges. Phase 3 → 4 is held until the user
+  // has actually finished reading every event the queue has produced — otherwise
+  // the server reaching `finalizing` would auto-skip past unread events.
+  const phase3HasUnreadWork =
+    queue.dockState === "revealing" ||
+    queue.dockState === "ready" ||
+    queue.dockState === "waiting";
+  const displayedPhase =
+    phase >= 4 && !phase3HasUnreadWork
+      ? phase
+      : Math.min(phase, Math.max(1, userUnlockedPhase + 1));
   // ---- per-frame derivations (cheap; no useMemo because `now` invalidates every tick) ----
 
   function arrivalAlpha(agentId: string): number {
-    const t = agentArrivedAt[agentId];
+    const t = effectiveArrived[agentId];
     if (t === undefined) return 0;
     return clamp((now - t) / ARRIVAL_FADE_MS, 0, 1);
   }
@@ -1142,7 +1169,7 @@ export function ScreenProcessing({
   // per frame, so the edge and node `<g>` blocks share derivations.
   const decoratedNodes = layout
     .map((n) => {
-      const arrivedAt = agentArrivedAt[n.agent.agent_id];
+      const arrivedAt = effectiveArrived[n.agent.agent_id];
       if (arrivedAt === undefined || now < arrivedAt) return null;
       const w = agentWeight[n.agent.agent_id] || 0;
       const pulse = activePulse(n.agent.agent_id);
@@ -1214,8 +1241,8 @@ export function ScreenProcessing({
       return "streaming";
     }
     if (displayedPhase === 2) {
-      if (planArrivedAt === null) return "streaming";
-      const lastRevealAt = planArrivedAt + 600 + (outline.length - 1) * PLAN_REVEAL_MS;
+      if (effectivePlanArrivedAt === null) return "streaming";
+      const lastRevealAt = effectivePlanArrivedAt + 600 + (outline.length - 1) * PLAN_REVEAL_MS;
       return now >= lastRevealAt ? "ready" : "revealing";
     }
     if (displayedPhase === 3) return queue.dockState;
@@ -1231,8 +1258,27 @@ export function ScreenProcessing({
       onContinue();
       return;
     }
-    if (displayedPhase === 1 || displayedPhase === 2) {
-      setUserUnlockedPhase(displayedPhase);
+    if (displayedPhase === 1) {
+      const ds = dockState();
+      if (ds === "streaming") {
+        // Collapse the staggered agent arrival so the user sees everyone now.
+        const t = performance.now() - ARRIVAL_FADE_MS - 1;
+        const next: Record<string, number> = {};
+        for (const a of agents) next[a.agent_id] = t;
+        setArrivalOverride(next);
+        return;
+      }
+      setUserUnlockedPhase(1);
+      return;
+    }
+    if (displayedPhase === 2) {
+      const ds = dockState();
+      if (ds === "revealing" && planArrivedAt !== null) {
+        // Collapse the staggered plan reveal so all year hints appear now.
+        setPlanRevealOverride(performance.now() - 600 - outline.length * PLAN_REVEAL_MS - 1);
+        return;
+      }
+      setUserUnlockedPhase(2);
       return;
     }
     if (displayedPhase === 3) {
@@ -1335,12 +1381,25 @@ export function ScreenProcessing({
                   <stop offset="0%" stopColor="oklch(0.74 0.09 65 / 0.35)" />
                   <stop offset="100%" stopColor="oklch(0.74 0.09 65 / 0)" />
                 </radialGradient>
+                <radialGradient id="edge-warm" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="oklch(0.78 0.11 65 / 1)" />
+                  <stop offset="55%" stopColor="oklch(0.74 0.09 65 / 0.85)" />
+                  <stop offset="100%" stopColor="oklch(0.6 0.06 65 / 0.35)" />
+                </radialGradient>
+                <radialGradient id="edge-cool" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="oklch(0.74 0.09 65 / 0.55)" />
+                  <stop offset="60%" stopColor="oklch(0.6 0.04 60 / 0.3)" />
+                  <stop offset="100%" stopColor="oklch(0.45 0.02 55 / 0.12)" />
+                </radialGradient>
                 <filter id="soft-glow" x="-50%" y="-50%" width="200%" height="200%">
                   <feGaussianBlur stdDeviation="2.5" result="blur" />
                   <feMerge>
                     <feMergeNode in="blur" />
                     <feMergeNode in="SourceGraphic" />
                   </feMerge>
+                </filter>
+                <filter id="line-glow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="1.6" />
                 </filter>
               </defs>
 
@@ -1353,10 +1412,10 @@ export function ScreenProcessing({
                   cy={cy}
                   r={r}
                   fill="none"
-                  stroke="var(--line)"
+                  stroke={i === 0 ? "var(--accent-line)" : "var(--ink-4)"}
                   strokeWidth="0.5"
                   strokeDasharray="2 6"
-                  opacity={phase >= 1 ? 0.55 - i * 0.12 : 0}
+                  opacity={phase >= 1 ? 0.7 - i * 0.18 : 0}
                   style={{ transition: "opacity 1.6s var(--ease)" }}
                 />
               ))}
@@ -1364,19 +1423,51 @@ export function ScreenProcessing({
               {decoratedNodes.map((n) => {
                 const driftX = phase === 4 ? (n.x - cx) * 0.25 * finalProgress : 0;
                 const driftY = phase === 4 ? (n.y - cy) * 0.25 * finalProgress : 0;
-                const baseOp = 0.18 + Math.min(0.5, n.w * 0.16);
-                const op = (baseOp + n.pulse * 0.45) * (1 - finalProgress * 0.5);
+                const x2 = n.x + driftX;
+                const y2 = n.y + driftY;
+                const isActiveEdge = n.pulse > 0.05;
+                const baseOp = 0.42 + Math.min(0.45, n.w * 0.18);
+                const op = (baseOp + n.pulse * 0.5) * (1 - finalProgress * 0.5);
+                const stroke = n.w > 0 || isActiveEdge ? "url(#edge-warm)" : "url(#edge-cool)";
+                const sw = 0.9 + Math.min(2.6, n.w * 0.55) + n.pulse * 1.8;
                 return (
-                  <line
-                    key={`edge-${n.agent.agent_id}`}
-                    x1={cx}
-                    y1={cy}
-                    x2={n.x + driftX}
-                    y2={n.y + driftY}
-                    stroke={n.w > 0 ? "var(--accent)" : "var(--ink-3)"}
-                    strokeWidth={0.6 + Math.min(2.4, n.w * 0.45) + n.pulse * 1.5}
-                    opacity={op * n.alpha}
-                  />
+                  <g key={`edge-${n.agent.agent_id}`} opacity={op * n.alpha}>
+                    {isActiveEdge && (
+                      <line
+                        x1={cx}
+                        y1={cy}
+                        x2={x2}
+                        y2={y2}
+                        stroke="var(--accent)"
+                        strokeWidth={sw + 2.4}
+                        opacity={0.18 * n.pulse}
+                        filter="url(#line-glow)"
+                      />
+                    )}
+                    <line
+                      x1={cx}
+                      y1={cy}
+                      x2={x2}
+                      y2={y2}
+                      stroke={stroke}
+                      strokeWidth={sw}
+                      strokeLinecap="round"
+                    />
+                    {isActiveEdge && (
+                      <line
+                        x1={cx}
+                        y1={cy}
+                        x2={x2}
+                        y2={y2}
+                        stroke="var(--accent)"
+                        strokeWidth={Math.max(0.8, sw * 0.55)}
+                        strokeDasharray="3 9"
+                        strokeLinecap="round"
+                        opacity={0.55 + n.pulse * 0.45}
+                        style={{ animation: "dash-flow 1100ms linear infinite" }}
+                      />
+                    )}
+                  </g>
                 );
               })}
 
@@ -1496,7 +1587,7 @@ export function ScreenProcessing({
               activeIdx={svgActiveIdx}
               phase={phase}
               now={now}
-              planArrivedAt={planArrivedAt}
+              planArrivedAt={effectivePlanArrivedAt}
             />
           </div>
         </div>
@@ -1511,9 +1602,67 @@ export function ScreenProcessing({
             position: "relative",
           }}
         >
-          <Meta style={{ marginBottom: 18, color: isError ? "var(--warn)" : undefined }}>
-            {storyHeader}
-          </Meta>
+          {/* Decorative bracket: tiny corner marks tying the right column to the constellation language */}
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              left: -1,
+              top: 0,
+              width: 14,
+              height: 14,
+              borderLeft: "1px solid var(--accent-line)",
+              borderTop: "1px solid var(--accent-line)",
+              opacity: 0.7,
+            }}
+          />
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              left: -1,
+              bottom: 18,
+              width: 14,
+              height: 14,
+              borderLeft: "1px solid var(--accent-line)",
+              borderBottom: "1px solid var(--accent-line)",
+              opacity: 0.5,
+            }}
+          />
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginBottom: 18,
+            }}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: 5,
+                height: 5,
+                transform: "rotate(45deg)",
+                background: isError ? "var(--warn)" : "var(--accent)",
+                boxShadow: isError ? "none" : "0 0 8px var(--accent-line)",
+                flexShrink: 0,
+              }}
+            />
+            <Meta style={{ color: isError ? "var(--warn)" : undefined, margin: 0 }}>
+              {storyHeader}
+            </Meta>
+            <span
+              aria-hidden
+              style={{
+                flex: 1,
+                height: 1,
+                background:
+                  "linear-gradient(to right, var(--line-soft), transparent)",
+                marginLeft: 4,
+              }}
+            />
+          </div>
 
           {isError && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16, animation: "fade-in 600ms var(--ease) both" }}>
@@ -1546,7 +1695,19 @@ export function ScreenProcessing({
           )}
 
           {!isError && displayedPhase === 1 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 14, overflow: "hidden" }}>
+            <div
+              className="scroll-amber"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 14,
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                paddingRight: 14,
+                paddingBottom: 8,
+              }}
+            >
               {decoratedNodes.map((n, i) => (
                 <div
                   key={n.agent.agent_id}
@@ -1594,7 +1755,19 @@ export function ScreenProcessing({
           )}
 
           {!isError && displayedPhase === 2 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, overflow: "hidden" }}>
+            <div
+              className="scroll-amber"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                paddingRight: 14,
+                paddingBottom: 8,
+              }}
+            >
               <div
                 className="serif"
                 style={{
@@ -1608,8 +1781,8 @@ export function ScreenProcessing({
                 A shape, in {endYear - startYear} years —
               </div>
               {outline.map((o, i) => {
-                if (planArrivedAt === null) return null;
-                const at = planArrivedAt + 600 + i * PLAN_REVEAL_MS;
+                if (effectivePlanArrivedAt === null) return null;
+                const at = effectivePlanArrivedAt + 600 + i * PLAN_REVEAL_MS;
                 if (now < at) return null;
                 return (
                   <div
