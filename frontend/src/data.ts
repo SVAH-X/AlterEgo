@@ -53,7 +53,7 @@ export const AE_DATA: SimulationData = {
       age: 40,
       title: "Your sister's wedding, on Zoom",
       event: "Q3 board prep lands the same week as the ceremony in Lisbon.",
-      did: "Sent a video. She said she understood.",
+      did: "Sent a video. They said they understood.",
       consequence: "You don't speak again for nine months. Neither of you names why.",
       tone: "neutral",
     },

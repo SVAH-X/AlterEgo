@@ -572,7 +572,7 @@ export function ScreenTimeline({
           }}
         >
           {(() => {
-            const p = nearestPortrait(simulation?.agedPortraits, "high", currentYear, Infinity);
+            const p = nearestPortrait(simulation?.agedPortraits, "high", currentYear);
             // Suppress the sweep over preserved pre-intervention faces.
             const showSweep =
               regeneratingFromYear !== null &&
