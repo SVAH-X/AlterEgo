@@ -5,6 +5,8 @@ interface TTSPlayer {
   playing: boolean;
   loading: boolean;
   play: (text: string, voiceId?: string) => Promise<void>;
+  /** Resolves when audio finishes playing (onended), or when stopped/aborted. */
+  playAndWait: (text: string, voiceId?: string) => Promise<void>;
   stop: () => void;
 }
 
@@ -14,12 +16,19 @@ export function useTTSPlayer(): TTSPlayer {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const endedResolversRef = useRef<Array<() => void>>([]);
 
   const cleanup = useCallback(() => {
     if (urlRef.current) {
       URL.revokeObjectURL(urlRef.current);
       urlRef.current = null;
     }
+  }, []);
+
+  const flushEndedResolvers = useCallback(() => {
+    const resolvers = endedResolversRef.current;
+    endedResolversRef.current = [];
+    resolvers.forEach((r) => r());
   }, []);
 
   const stop = useCallback(() => {
@@ -34,7 +43,8 @@ export function useTTSPlayer(): TTSPlayer {
     cleanup();
     setPlaying(false);
     setLoading(false);
-  }, [cleanup]);
+    flushEndedResolvers();
+  }, [cleanup, flushEndedResolvers]);
 
   const play = useCallback(
     async (text: string, voiceId?: string) => {
@@ -49,12 +59,13 @@ export function useTTSPlayer(): TTSPlayer {
       } catch (e) {
         setLoading(false);
         if ((e as { name?: string }).name === "AbortError") return;
-        // silently fall back; the screen still has visible text
         console.warn("tts failed:", e);
+        flushEndedResolvers();
         return;
       }
       if (ac.signal.aborted) {
         URL.revokeObjectURL(url);
+        flushEndedResolvers();
         return;
       }
       const audio = new Audio(url);
@@ -63,28 +74,41 @@ export function useTTSPlayer(): TTSPlayer {
       audio.onended = () => {
         setPlaying(false);
         cleanup();
+        flushEndedResolvers();
       };
       audio.onerror = () => {
         setPlaying(false);
         cleanup();
+        flushEndedResolvers();
       };
       try {
         await audio.play();
         setPlaying(true);
       } catch (e) {
-        // autoplay-blocked etc. — bail quietly, screen text still works
         console.warn("audio.play() rejected:", e);
         cleanup();
+        flushEndedResolvers();
       } finally {
         setLoading(false);
       }
     },
-    [stop, cleanup],
+    [stop, cleanup, flushEndedResolvers],
+  );
+
+  const playAndWait = useCallback(
+    async (text: string, voiceId?: string) => {
+      const waitForEnd = new Promise<void>((resolve) => {
+        endedResolversRef.current.push(resolve);
+      });
+      await play(text, voiceId);
+      await waitForEnd;
+    },
+    [play],
   );
 
   useEffect(() => {
     return () => stop();
   }, [stop]);
 
-  return { playing, loading, play, stop };
+  return { playing, loading, play, playAndWait, stop };
 }

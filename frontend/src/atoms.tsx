@@ -68,7 +68,6 @@ export function PortraitImage({ src, alt, className, style }: PortraitImageProps
   }
   return (
     <img
-      key={src}
       src={src}
       alt={alt}
       onError={() => setFailedSrc(src)}
@@ -78,7 +77,6 @@ export function PortraitImage({ src, alt, className, style }: PortraitImageProps
         height: "100%",
         objectFit: "cover",
         borderRadius: 8,
-        animation: "fade-in-slow 700ms var(--ease) both",
         ...style,
       }}
     />

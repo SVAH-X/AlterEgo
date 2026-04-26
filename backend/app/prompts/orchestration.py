@@ -9,6 +9,9 @@ Phases:
 
 from typing import Optional
 
+import json
+import re
+
 from app.models.checkpoint import Checkpoint
 from app.models.orchestration import AgentSpec, OutlineEvent
 from app.models.profile import Profile, VALID_VALUES_DYADS
@@ -92,7 +95,7 @@ Profile:
 - work hours per week: {profile.workHours}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
-- target year: {profile.targetYear} (present year: {profile.presentYear}){_mbti_block(profile)}{_values_block(profile)}
+- target year: {profile.targetYear} (present year: {profile.presentYear}){_mbti_block(profile)}{_values_block(profile)}{_health_block(profile)}
 
 Output the agent list as strict JSON only."""
 
@@ -217,7 +220,7 @@ def render_branched_planning_user(
     )
     return f"""\
 Profile:
-- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}
+- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}{_health_block(profile)}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
 - horizon: {profile.presentYear} to {profile.targetYear}
@@ -348,7 +351,7 @@ still happen on their own timing. They just land differently on a \
 person making a different choice."""
     return f"""\
 Profile:
-- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}
+- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}{_health_block(profile)}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
 - horizon: {profile.presentYear} to {profile.targetYear} ({profile.targetYear - profile.presentYear} years)
@@ -455,7 +458,7 @@ def render_detail_user(
     )
     return f"""\
 Profile:
-- {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}
+- {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}{_health_block(profile)}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
 
@@ -528,7 +531,7 @@ def render_finalize_user(
 Profile:
 - {profile.name}, age {profile.age} → {profile.targetYear}
 - top goal at start: {profile.topGoal}
-- top fear at start: {profile.topFear}
+- top fear at start: {profile.topFear}{_health_block(profile)}
 
 Lived trajectory:
 {cps}
@@ -590,3 +593,156 @@ def _values_block(profile: Profile) -> str:
     if not parts:
         return ""
     return "\n- values (forced-choice): leans " + ", ".join(parts)
+
+
+# Render the user's actual bucket strings (no re-encoding) so the model sees what they picked.
+
+_HEALTH_BODY_LABELS: list[tuple[str, str, str]] = [
+    # (Profile attribute, prefix shown to the model, suffix unit)
+    ("sleepHours", "Sleep", "hrs/night"),
+    ("exerciseDays", "Exercise", "days/week"),
+    ("caffeineCups", "Caffeine", "cups/day"),
+    ("alcoholDrinks", "Alcohol", "drinks/week"),
+]
+
+_HEALTH_MIND_LABELS: list[tuple[str, str, str]] = [
+    ("stressLevel", "Stress", ""),
+    ("moodBaseline", "Mood", ""),
+    ("lonelinessFrequency", "Loneliness", ""),
+]
+
+
+def _health_block(profile: Profile) -> str:
+    """Return a formatted block of health-intake answers, or '' if nothing set.
+
+    Empty string when all seven fields are None — keeps prompts byte-identical
+    to the pre-feature world. Otherwise returns a leading-newline block that
+    inline-appends after the work-hours bullet, just like _mbti_block.
+    """
+
+    def _section(items: list[tuple[str, str, str]]) -> list[str]:
+        lines: list[str] = []
+        for attr, prefix, suffix in items:
+            val = getattr(profile, attr, None)
+            if val is None:
+                continue
+            line = f"  - {prefix}: {val}"
+            if suffix:
+                line += f" {suffix}"
+            lines.append(line)
+        return lines
+
+    body_lines = _section(_HEALTH_BODY_LABELS)
+    mind_lines = _section(_HEALTH_MIND_LABELS)
+    if not body_lines and not mind_lines:
+        return ""
+
+    out = ["\nHealth background:"]
+    if body_lines:
+        out.append("  Body:")
+        out.extend(body_lines)
+    if mind_lines:
+        out.append("  Mind:")
+        out.extend(mind_lines)
+    return "\n".join(out)
+
+
+# ---------------------------------------------------------------------------
+# CLINICAL SUMMARY — final card that ships in the reveal.
+
+CLINICAL_SUMMARY_SYSTEM = """\
+You are writing a short clinical read-out for AlterEgo's reveal screen — \
+think doctor's after-visit summary, not narrative.
+
+Output 2 to 3 health findings covering body and/or mind. Pick the items that \
+actually matter for this person at the end of the trajectory. Examples of \
+valid findings:
+- cardiovascular load, hypertension risk, metabolic syndrome risk
+- chronic sleep debt, insomnia pattern
+- alcohol use above guideline, sedentary lifestyle
+- burnout, chronic stress load, anxiety pattern, depressive symptoms
+- social isolation, weak support network
+- protective factors: stable sleep, regular exercise, strong social ties, \
+low substance use, resilient mood baseline
+
+Mix positive and negative findings honestly. If something is fine, say it's \
+fine. Don't invent risk that isn't there. Don't omit real risk to be nice.
+
+Each finding is:
+- label: a clinical-style descriptor, ≤5 words. e.g. "Sleep: chronically short", \
+"Cardiovascular: elevated risk", "Mood: stable", "Alcohol: above guideline", \
+"Social support: strong".
+- consequence: one plain sentence, ≤18 words, naming the actual health \
+implication. No story callbacks, no metaphor, no "the years of...", no \
+"by [year] you...". Just the health fact. e.g. "Average 5 hrs/night raises \
+long-term cardiovascular and cognitive risk." or "Regular exercise and \
+moderate alcohol keep metabolic markers in healthy range."
+
+Then output finalHealthState: "stable", "strained", or "critical" — based on \
+the overall picture, not one finding.
+
+# Output (strict JSON, no prose, no code fence)
+
+{
+  "riskFactors": [
+    {"label": "short clinical label, ≤5 words", "consequence": "one plain sentence, ≤18 words"},
+    ...
+  ],
+  "finalHealthState": "stable" | "strained" | "critical"
+}
+
+Rules:
+- Exactly 2 or 3 entries.
+- Plain, clinical, concise. No poetry, no motivation, no narrative recap.
+- finalHealthState is exactly one of the three allowed strings.
+"""
+
+
+def render_clinical_user(
+    profile: Profile,
+    checkpoints: list[Checkpoint],
+    final_state_hint: str,
+) -> str:
+    cps = "\n".join(
+        f"  {c.year} (age {c.age}): {c.title}. {c.event} {c.did} {c.consequence}"
+        for c in checkpoints
+    )
+    return f"""\
+Profile:
+- {profile.name}, age {profile.age} → {profile.targetYear}
+- top goal at start: {profile.topGoal}
+- top fear at start: {profile.topFear}{_health_block(profile)}
+
+Lived trajectory:
+{cps}
+
+Final-state hint (from the simulation's state vector): {final_state_hint}
+
+Output the JSON object only."""
+
+
+def parse_clinical_summary(raw: str) -> Optional["ClinicalSummary"]:
+    """Parse the model's clinical-summary response. Returns None on any
+    failure — the orchestrator treats that as 'no clinical card' and the
+    reveal screen stacks back to its single-column layout."""
+    from app.models.clinical import ClinicalSummary  # local import: avoid cycle
+
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.lower().startswith("json"):
+            text = text[4:].lstrip()
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        m = re.search(r"\{.*\}", text, flags=re.DOTALL)
+        if not m:
+            return None
+        try:
+            data = json.loads(m.group(0))
+        except json.JSONDecodeError:
+            return None
+    try:
+        return ClinicalSummary.model_validate(data)
+    except Exception:
+        return None

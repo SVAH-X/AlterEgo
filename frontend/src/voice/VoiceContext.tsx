@@ -22,6 +22,9 @@ interface VoiceState {
   /** Total recorded duration across intakeSamples in seconds. */
   intakeSamplesSeconds: number;
   pushIntakeSeconds: (sec: number) => void;
+  /** Voice-only hands-free intake vs. typed intake. null = user has not chosen yet. */
+  inputMode: "voice" | "typing" | null;
+  setInputMode: (m: "voice" | "typing" | null) => void;
 }
 
 const VoiceCtx = createContext<VoiceState | null>(null);
@@ -40,6 +43,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const [clonedVoiceId, setClonedVoiceId] = useState<string | null>(null);
   const [intakeSamples, setIntakeSamples] = useState<Blob[]>([]);
   const [intakeSamplesSeconds, setIntakeSamplesSeconds] = useState(0);
+  const [inputMode, setInputMode] = useState<"voice" | "typing" | null>(null);
 
   const setVoiceMode = useCallback((v: boolean) => {
     setVoiceModeState(v);
@@ -78,6 +82,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       clearIntakeSamples,
       intakeSamplesSeconds,
       pushIntakeSeconds,
+      inputMode,
+      setInputMode,
     }),
     [
       voiceMode,
@@ -90,6 +96,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       clearIntakeSamples,
       intakeSamplesSeconds,
       pushIntakeSeconds,
+      inputMode,
+      setInputMode,
     ],
   );
 

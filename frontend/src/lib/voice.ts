@@ -34,6 +34,17 @@ export async function stt(blob: Blob, signal?: AbortSignal): Promise<string> {
   return data.text;
 }
 
+/** Trim-and-null wrapper around `stt`. Returns null on failure or empty result. */
+export async function transcribe(blob: Blob): Promise<string | null> {
+  try {
+    const text = (await stt(blob)).trim();
+    return text || null;
+  } catch (e) {
+    console.warn("stt failed:", e);
+    return null;
+  }
+}
+
 export async function cloneVoice(
   samples: Blob[],
   name: string,

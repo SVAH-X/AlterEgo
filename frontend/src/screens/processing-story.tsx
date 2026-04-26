@@ -305,94 +305,147 @@ export interface ScrollEntryProps {
   now: number;
 }
 
-const RECENCY_OPACITY = [1.0, 0.55, 0.35, 0.25];
+const RECENCY_OPACITY = [1.0, 0.7, 0.55, 0.45];
 
 export function ScrollEntryView({ entry, rank, age, now }: ScrollEntryProps) {
   const isActive = rank === 0;
-  const opacity =
-    RECENCY_OPACITY[Math.min(rank, RECENCY_OPACITY.length - 1)];
+  const [hovered, setHovered] = useState(false);
+  const baseOpacity = RECENCY_OPACITY[Math.min(rank, RECENCY_OPACITY.length - 1)];
+  const opacity = isActive ? 1 : (hovered ? 1 : baseOpacity);
 
   const visibleBubbles = isActive
     ? entry.bubbles.filter(
         (_, i) => now - entry.revealStartedAt >= i * BUBBLE_STAGGER_MS,
       )
-    : [];
+    : entry.bubbles;
 
   const enterAlpha = clamp((now - entry.revealStartedAt) / ENTRY_FADE_MS, 0, 1);
   const enterShift = (1 - enterAlpha) * 14;
 
   return (
     <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         opacity: opacity * (isActive ? enterAlpha : 1),
         transform: isActive ? `translateY(${enterShift}px)` : undefined,
         transition: isActive
-          ? undefined
-          : "opacity 600ms var(--ease)",
-        display: "flex",
-        flexDirection: "column",
-        gap: isActive ? 14 : 4,
-        paddingBottom: isActive ? 0 : 6,
+          ? "opacity 400ms var(--ease)"
+          : "opacity 400ms var(--ease)",
+        display: "grid",
+        gridTemplateColumns: "44px 1fr",
+        gap: 14,
+        paddingBottom: isActive ? 0 : 14,
+        borderBottom: isActive ? "none" : "1px solid var(--line-soft)",
       }}
     >
-      <div>
+      {/* gutter: year sigil + age */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          paddingTop: 2,
+          gap: 6,
+        }}
+      >
         <div
           className="mono"
           style={{
-            fontSize: isActive ? 11 : 10,
-            letterSpacing: "0.22em",
-            color: isActive ? "var(--accent)" : "var(--ink-3)",
-            textTransform: "uppercase",
-            marginBottom: 6,
+            fontSize: 10,
+            letterSpacing: "0.18em",
+            color: isActive ? "var(--accent)" : "var(--ink-2)",
+            fontVariantNumeric: "tabular-nums",
+            transition: "color 400ms var(--ease)",
           }}
         >
           {entry.checkpoint.year}
-          {age !== null ? ` · age ${age}` : ""}
         </div>
+        {age !== null && (
+          <div
+            className="mono"
+            style={{
+              fontSize: 8.5,
+              letterSpacing: "0.22em",
+              color: "var(--ink-3)",
+              textTransform: "uppercase",
+            }}
+          >
+            age {age}
+          </div>
+        )}
+        {/* sigil: small diamond connecting to constellation language */}
+        <div
+          style={{
+            marginTop: 6,
+            width: 6,
+            height: 6,
+            transform: "rotate(45deg)",
+            background: isActive ? "var(--accent)" : "var(--ink-4)",
+            boxShadow: isActive ? "0 0 8px var(--accent-line)" : "none",
+            transition: "background 400ms var(--ease), box-shadow 400ms var(--ease)",
+          }}
+        />
+      </div>
+
+      {/* body */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: isActive ? 14 : 8,
+          borderLeft: isActive
+            ? "1px solid var(--accent-line)"
+            : "1px solid var(--line-soft)",
+          paddingLeft: 16,
+          transition: "border-color 400ms var(--ease)",
+        }}
+      >
         <div
           className="serif"
           style={{
-            fontSize: isActive ? 22 : 16,
+            fontSize: isActive ? 22 : 17,
             fontStyle: "italic",
             lineHeight: 1.3,
             color: isActive ? "var(--ink)" : "var(--ink-1)",
+            letterSpacing: "0.005em",
           }}
         >
           {entry.checkpoint.title || entry.bubbles[0]?.line}
         </div>
-      </div>
 
-      {visibleBubbles.map((b, j) => (
-        <div
-          key={`${entry.outlineIdx}-${j}`}
-          style={{ animation: "fade-in 600ms var(--ease) both" }}
-        >
+        {visibleBubbles.map((b, j) => (
           <div
-            className="mono"
-            style={{
-              fontSize: 10,
-              letterSpacing: "0.22em",
-              color: b.who === "narrator" ? "var(--ink-2)" : "var(--accent)",
-              textTransform: "uppercase",
-              marginBottom: 4,
-            }}
+            key={`${entry.outlineIdx}-${j}`}
+            style={{ animation: isActive ? "fade-in 600ms var(--ease) both" : undefined }}
           >
-            {b.who === "narrator" ? "—" : b.who}
+            <div
+              className="mono"
+              style={{
+                fontSize: 9.5,
+                letterSpacing: "0.22em",
+                color: b.who === "narrator" ? "var(--ink-3)" : "var(--accent)",
+                textTransform: "uppercase",
+                marginBottom: 4,
+              }}
+            >
+              {b.who === "narrator" ? "—— narrator" : b.who}
+            </div>
+            <div
+              className="serif"
+              style={{
+                fontSize: isActive ? (b.who === "narrator" ? 17 : 18) : 14.5,
+                lineHeight: b.who === "narrator" ? 1.55 : 1.5,
+                color: b.who === "narrator" ? "var(--ink-1)" : "var(--ink)",
+                fontStyle: b.who === "narrator" ? "italic" : "normal",
+                letterSpacing: "0.003em",
+              }}
+            >
+              {b.who === "narrator" ? b.line : `“${b.line}”`}
+            </div>
           </div>
-          <div
-            className="serif"
-            style={{
-              fontSize: b.who === "narrator" ? 17 : 18,
-              lineHeight: b.who === "narrator" ? 1.55 : 1.5,
-              color: b.who === "narrator" ? "var(--ink-1)" : "var(--ink)",
-              fontStyle: b.who === "narrator" ? "italic" : "normal",
-              letterSpacing: "0.003em",
-            }}
-          >
-            {b.who === "narrator" ? b.line : `“${b.line}”`}
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -405,33 +458,54 @@ export interface StoryScrollProps {
 /**
  * StoryScroll
  * Bottom-anchored: latest entry sits at the bottom; older entries push up.
- * Top edge is masked so older overflow fades into the background.
+ * Each advance (space / next button) snaps to the bottom and keeps the new
+ * entry pinned for the duration of its bubble reveal so growing content stays
+ * in view. Between advances the user can freely scroll up to re-read.
  */
 export function StoryScroll({ visible, now }: StoryScrollProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
-    containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    const el = containerRef.current;
+    if (!el) return;
+    const last = visible[visible.length - 1];
+    if (!last) return;
+
+    const revealEndsAt =
+      last.revealStartedAt +
+      last.bubbles.length * BUBBLE_STAGGER_MS +
+      READY_HINT_DELAY_MS;
+
+    let raf = 0;
+    const stick = () => {
+      if (!containerRef.current) return;
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      if (performance.now() < revealEndsAt) {
+        raf = requestAnimationFrame(stick);
+      }
+    };
+    raf = requestAnimationFrame(stick);
+    return () => cancelAnimationFrame(raf);
   }, [visible.length]);
 
   return (
     <div
       ref={containerRef}
+      className="scroll-amber"
       style={{
         flex: 1,
         minHeight: 0,
         overflowY: "auto",
         display: "flex",
         flexDirection: "column",
-        gap: 28,
+        gap: 22,
         paddingTop: 28,
+        paddingRight: 14,
         paddingBottom: 4,
         WebkitMaskImage:
-          "linear-gradient(to bottom, transparent 0, #000 56px, #000 100%)",
+          "linear-gradient(to bottom, transparent 0, #000 56px, #000 calc(100% - 8px), transparent 100%)",
         maskImage:
-          "linear-gradient(to bottom, transparent 0, #000 56px, #000 100%)",
-        scrollbarWidth: "none",
+          "linear-gradient(to bottom, transparent 0, #000 56px, #000 calc(100% - 8px), transparent 100%)",
       }}
     >
       {visible.map((entry, i) => (

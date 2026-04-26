@@ -1,6 +1,14 @@
 export type Tone = "neutral" | "warn" | "good";
 export type Trajectory = "high" | "low";
 
+export type SleepHours = "<5" | "5-6" | "6-7" | "7-8" | "8+";
+export type ExerciseDays = "0" | "1-2" | "3-4" | "5+";
+export type CaffeineCups = "0" | "1" | "2" | "3" | "4+";
+export type AlcoholDrinks = "0" | "1-3" | "4-7" | "8-14" | "15+";
+export type StressLevel = "low" | "moderate" | "high" | "severe";
+export type MoodBaseline = "mostly low" | "mixed" | "mostly steady" | "mostly positive";
+export type LonelinessFrequency = "rarely" | "sometimes" | "often";
+
 export interface Profile {
   name: string;
   age: number;
@@ -12,6 +20,15 @@ export interface Profile {
   presentYear: number;
   mbti?: string | null;
   values?: Record<string, string> | null;
+  // Body
+  sleepHours?: SleepHours | null;
+  exerciseDays?: ExerciseDays | null;
+  caffeineCups?: CaffeineCups | null;
+  alcoholDrinks?: AlcoholDrinks | null;
+  // Mind
+  stressLevel?: StressLevel | null;
+  moodBaseline?: MoodBaseline | null;
+  lonelinessFrequency?: LonelinessFrequency | null;
 }
 
 export interface Checkpoint {
@@ -31,6 +48,18 @@ export interface AgedPortrait {
   imageUrl: string | null;
 }
 
+export type HealthState = "stable" | "strained" | "critical";
+
+export interface ClinicalRiskFactor {
+  label: string;
+  consequence: string;
+}
+
+export interface ClinicalSummary {
+  riskFactors: ClinicalRiskFactor[];
+  finalHealthState: HealthState;
+}
+
 export interface SimulationData {
   profile: Profile;
   agents: AgentSpec[];
@@ -38,6 +67,7 @@ export interface SimulationData {
   checkpointsHigh: Checkpoint[];
   futureSelfOpening: string;
   futureSelfReplies: Record<string, string>;
+  clinicalSummary?: ClinicalSummary | null;
 }
 
 // --- Streaming orchestration shapes ---

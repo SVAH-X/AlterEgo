@@ -4,7 +4,6 @@ export function nearestPortrait(
   portraits: AgedPortrait[] | undefined,
   trajectory: Trajectory,
   year: number,
-  maxDistance = 3,
 ): AgedPortrait | null {
   if (!portraits) return null;
   let best: AgedPortrait | null = null;
@@ -17,5 +16,5 @@ export function nearestPortrait(
       best = p;
     }
   }
-  return bestDist <= maxDistance ? best : null;
+  return best;
 }

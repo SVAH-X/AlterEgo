@@ -3,13 +3,14 @@ import type { FilledOutline, ScreenProps, SimStreamPhase } from "../App";
 import { clamp, Mark, Meta, PortraitImage, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
 import { nearestPortrait } from "../lib/portraits";
-import type { AgentSpec, Profile } from "../types";
+import type { AgentSpec, ClinicalSummary, Profile } from "../types";
 import romanStatue from "../assets/roman-half-blur.png";
 import darkClouds from "../assets/dark-grey-clouds-over-the-ocean.jpg";
 import { useVoice, useVoicePrimed } from "../voice/VoiceContext";
 import { useTTSPlayer } from "../voice/useTTSPlayer";
 import { MicButton } from "../voice/MicButton";
 import { cloneVoice } from "../lib/voice";
+import { useVoiceTurn } from "../voice/useVoiceTurn";
 import {
   AdvanceDock,
   StoryScroll,
@@ -286,27 +287,407 @@ function parseSpokenInteger(raw: string): number | null {
   return total + current;
 }
 
+type HealthFieldKey =
+  | "sleepHours"
+  | "exerciseDays"
+  | "caffeineCups"
+  | "alcoholDrinks"
+  | "stressLevel"
+  | "moodBaseline"
+  | "lonelinessFrequency";
+
+interface HealthRow {
+  key: HealthFieldKey;
+  label: string;
+  options: string[];
+  suffix?: string;
+}
+
+const HEALTH_BODY_ROWS: HealthRow[] = [
+  { key: "sleepHours", label: "Sleep per night", options: ["<5", "5-6", "6-7", "7-8", "8+"], suffix: "hrs" },
+  { key: "exerciseDays", label: "Exercise per week", options: ["0", "1-2", "3-4", "5+"], suffix: "days" },
+  { key: "caffeineCups", label: "Caffeine per day", options: ["0", "1", "2", "3", "4+"], suffix: "cups" },
+  { key: "alcoholDrinks", label: "Alcohol per week", options: ["0", "1-3", "4-7", "8-14", "15+"], suffix: "drinks" },
+];
+
+const HEALTH_MIND_ROWS: HealthRow[] = [
+  { key: "stressLevel", label: "Typical stress", options: ["low", "moderate", "high", "severe"] },
+  { key: "moodBaseline", label: "Mood, last month", options: ["mostly low", "mixed", "mostly steady", "mostly positive"] },
+  { key: "lonelinessFrequency", label: "Loneliness", options: ["rarely", "sometimes", "often"] },
+];
+
+function HealthButtonGroup({
+  row,
+  value,
+  onSelect,
+}: {
+  row: HealthRow;
+  value: string | null | undefined;
+  onSelect: (next: string | null) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "clamp(12px, 2vw, 20px)",
+        flexWrap: "wrap",
+      }}
+    >
+      <div
+        style={{
+          flex: "0 0 auto",
+          minWidth: 180,
+          fontFamily: "var(--mono)",
+          fontSize: 11,
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          color: "var(--ink-1)",
+        }}
+      >
+        {row.label}
+        {row.suffix ? <span style={{ opacity: 0.55 }}> ({row.suffix})</span> : null}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {row.options.map((opt) => {
+          const selected = value === opt;
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => onSelect(selected ? null : opt)}
+              style={{
+                padding: "8px 14px",
+                borderRadius: 999,
+                border: `1px solid ${selected ? "var(--accent)" : "var(--line-soft)"}`,
+                background: selected ? "var(--accent)" : "transparent",
+                color: selected ? "var(--bg-1)" : "var(--ink-0)",
+                fontFamily: "var(--mono)",
+                fontSize: 12,
+                letterSpacing: "0.05em",
+                cursor: "pointer",
+                transition: "all 200ms var(--ease)",
+              }}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function ScreenHealth({ onContinue, onJumpTo, profile, setProfile }: ScreenProps) {
+  const set = (key: HealthFieldKey, value: string | null) => {
+    setProfile({ ...profile, [key]: value });
+  };
+  const { voiceMode } = useVoice();
+  const voicePrimed = useVoicePrimed();
+  const tts = useTTSPlayer();
+  const playedRef = useRef(false);
+  useEffect(() => {
+    if (playedRef.current) return;
+    if (voiceMode && voicePrimed) {
+      playedRef.current = true;
+      tts.play("A few quick health questions. Tap your answers.");
+    }
+    return () => tts.stop();
+  }, [voiceMode, voicePrimed, tts]);
+
+  return (
+    <div
+      style={{
+        height: "100%",
+        position: "relative",
+        overflow: "hidden",
+        animation: "fade-in 600ms var(--ease)",
+      }}
+    >
+      <div className="mark-anchor">
+        <Mark onClick={() => onJumpTo("landing")} />
+      </div>
+      <div
+        style={{
+          height: "100%",
+          overflowY: "auto",
+          overflowX: "hidden",
+        }}
+      >
+        <div
+          style={{
+            minHeight: "100%",
+            maxWidth: 720,
+            margin: "0 auto",
+            padding: "clamp(64px, 10vh, 120px) clamp(20px, 4vw, 48px) 140px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "clamp(28px, 4vh, 44px)",
+            boxSizing: "border-box",
+          }}
+        >
+          <div>
+            <h2
+              className="serif"
+              style={{
+                fontSize: "clamp(28px, 3.5vw, 40px)",
+                lineHeight: 1.15,
+                fontWeight: 400,
+                margin: 0,
+              }}
+            >
+              A little about your body and mind.
+            </h2>
+            <Meta style={{ marginTop: 12 }}>
+              All optional. Tap an answer to set it; tap again to clear.
+            </Meta>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <Meta style={{ color: "var(--accent)" }}>Body</Meta>
+            {HEALTH_BODY_ROWS.map((row) => (
+              <HealthButtonGroup
+                key={row.key}
+                row={row}
+                value={profile[row.key] as string | null | undefined}
+                onSelect={(next) => set(row.key, next)}
+              />
+            ))}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <Meta style={{ color: "var(--accent)" }}>Mind</Meta>
+            {HEALTH_MIND_ROWS.map((row) => (
+              <HealthButtonGroup
+                key={row.key}
+                row={row}
+                value={profile[row.key] as string | null | undefined}
+                onSelect={(next) => set(row.key, next)}
+              />
+            ))}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+            <button
+              type="button"
+              onClick={onContinue}
+              style={{
+                all: "unset",
+                cursor: "pointer",
+                fontFamily: "var(--mono)",
+                fontSize: 12,
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                color: "var(--accent)",
+                padding: "12px 18px",
+                border: "1px solid var(--accent)",
+                borderRadius: 999,
+                transition: "background 200ms var(--ease), color 200ms var(--ease)",
+              }}
+            >
+              continue →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ClinicalCard({
+  summary,
+  visible,
+  size = "default",
+}: {
+  summary: ClinicalSummary;
+  visible: boolean;
+  size?: "default" | "lg";
+}) {
+  const stateColor: Record<string, string> = {
+    stable: "var(--good)",
+    strained: "var(--accent)",
+    critical: "var(--warn)",
+  };
+  const isLg = size === "lg";
+  return (
+    <div
+      style={{
+        opacity: visible ? 1 : 0,
+        transition: "opacity 1600ms var(--ease)",
+        maxWidth: isLg ? 520 : 360,
+        width: "100%",
+        boxSizing: "border-box",
+        padding: isLg ? "32px 36px" : "24px 26px",
+        borderTop: `1px solid ${stateColor[summary.finalHealthState]}`,
+        borderBottom: `1px solid var(--line-soft)`,
+        display: "flex",
+        flexDirection: "column",
+        gap: isLg ? 22 : 16,
+        background: "rgba(255,255,255,0.015)",
+        textAlign: "left",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <Meta style={{ color: "var(--accent)" }}>clinical read</Meta>
+        <Meta style={{ color: stateColor[summary.finalHealthState] }}>
+          {summary.finalHealthState}
+        </Meta>
+      </div>
+      <ul
+        style={{
+          listStyle: "none",
+          padding: 0,
+          margin: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: isLg ? 18 : 14,
+        }}
+      >
+        {summary.riskFactors.map((rf, i) => (
+          <li key={i} style={{ display: "flex", flexDirection: "column", gap: isLg ? 6 : 4 }}>
+            <span
+              className="serif"
+              style={{
+                fontSize: isLg ? 22 : 17,
+                lineHeight: 1.3,
+                fontStyle: "italic",
+              }}
+            >
+              {rf.label}
+            </span>
+            <span
+              style={{
+                fontSize: isLg ? 15 : 13,
+                lineHeight: 1.55,
+                color: "var(--ink-1)",
+              }}
+            >
+              {rf.consequence}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVoiceSample }: ScreenProps) {
   const [step, setStep] = useState(0);
   const cur = INTAKE_FIELDS[step];
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const { voiceMode, setVoiceMode, prime, pushIntakeSample, pushIntakeSeconds } = useVoice();
+  const {
+    voiceMode,
+    setVoiceMode,
+    prime,
+    pushIntakeSample,
+    pushIntakeSeconds,
+    inputMode,
+    setInputMode,
+  } = useVoice();
   const voicePrimed = useVoicePrimed();
   const tts = useTTSPlayer();
+  const turn = useVoiceTurn();
 
-  // Auto-play the current question when entering voice mode.
+  // Per-step fallback latch: if a voice turn fell back to typing for THIS
+  // question, freeze it as a typed input until the user advances.
+  const [forceTypedField, setForceTypedField] = useState(false);
+  // Bumped to re-trigger the voice-mode effect for the same step (redo).
+  const [redoNonce, setRedoNonce] = useState(0);
+  // Holds the transcript awaiting confirmation. While set, Space/Enter advances
+  // and R re-runs the turn.
+  const [pendingTranscript, setPendingTranscript] = useState<string | null>(null);
+
+  const isVoice = inputMode === "voice" && !forceTypedField;
+  const isSpeechField =
+    cur.type === "text" || cur.type === "number" || cur.type === "textarea";
+
+  // Reset the per-field fallback latch and any pending transcript when the step changes.
   useEffect(() => {
+    setForceTypedField(false);
+    setPendingTranscript(null);
+  }, [step]);
+
+  useEffect(() => {
+    if (inputMode === "voice") return;
     if (voiceMode && voicePrimed) tts.play(cur.label);
     else tts.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, voiceMode, voicePrimed]);
+  }, [step, voiceMode, voicePrimed, inputMode]);
 
-  function onRecorded(blob: Blob, durationMs: number) {
-    // Keep every clip so users can reach cloning threshold quickly.
-    prime();
-    if (!voiceMode) setVoiceMode(true);
-    pushIntakeSample(blob);
-    pushIntakeSeconds(durationMs / 1000);
+  // Voice-mode driver: one turn per step (or per redo). Do NOT add
+  // forceTypedField to deps — it would re-fire turn.abort() and start a
+  // fresh turn after fallback.
+  useEffect(() => {
+    if (inputMode !== "voice") return;
+    let cancelled = false;
+
+    (async () => {
+      if (!isSpeechField) {
+        await tts.playAndWait(cur.label);
+        return;
+      }
+      const result = await turn.runTurn(cur.label);
+      if (cancelled) return;
+      if (result.blob) {
+        pushVoiceSample(result.blob);
+        pushIntakeSample(result.blob);
+        pushIntakeSeconds(result.durationMs / 1000);
+        prime();
+      }
+      if (result.fellBack) {
+        setForceTypedField(true);
+        return;
+      }
+      if (result.transcript) {
+        setPendingTranscript(result.transcript);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      turn.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, inputMode, redoNonce]);
+
+  // While a transcript is pending confirmation, listen for Space/Enter (confirm)
+  // and R (redo). Hands-free chat: no need to touch the keyboard mouse.
+  useEffect(() => {
+    if (pendingTranscript === null) return;
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      if (target?.matches?.("input, textarea")) return;
+      if (e.key === " " || e.code === "Space" || e.key === "Enter") {
+        e.preventDefault();
+        confirmPending();
+      } else if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        redoPending();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingTranscript]);
+
+  function confirmPending() {
+    if (pendingTranscript === null) return;
+    applyValue(pendingTranscript, "voice");
+    setPendingTranscript(null);
+    turn.reset();
+    advance();
+  }
+
+  function redoPending() {
+    setPendingTranscript(null);
+    turn.reset();
+    setRedoNonce((n) => n + 1);
+  }
+
+  function advance() {
+    tts.stop();
+    if (step < INTAKE_FIELDS.length - 1) setStep(step + 1);
+    else onContinue();
   }
 
   function next() {
@@ -315,23 +696,14 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
       const allAnswered = cur.dyads.every((d) => Boolean(picks[d.slug]));
       if (!allAnswered) return;
     }
-    tts.stop();
-    if (step < INTAKE_FIELDS.length - 1) setStep(step + 1);
-    else onContinue();
+    advance();
   }
 
-  // For targetYear we display *years ahead* in the input but persist the
-  // absolute year on the profile. Everything downstream still consumes
-  // profile.targetYear as an absolute year.
   const isYearsAheadField = cur.key === "targetYear";
   const value = isYearsAheadField
     ? Math.max(0, profile.targetYear - profile.presentYear)
     : profile[cur.key];
 
-  // One setter for both keystrokes and live transcripts. Voice input on a
-  // number field arrives chatty ("about thirty two years"), so we extract
-  // the first integer; if no digit shows up yet we hold the previous value
-  // instead of clobbering it with 0.
   function applyValue(raw: string, source: "type" | "voice") {
     if (cur.type !== "number") {
       setProfile({ ...profile, [cur.key]: raw });
@@ -343,8 +715,6 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
       if (parsed === null) return;
       n = parsed;
     } else {
-      // Strip anything that isn't a digit so users can't paste
-      // non-numeric content; empty string is allowed (clears field).
       const digits = raw.replace(/[^0-9]/g, "");
       n = digits === "" ? 0 : Number(digits);
     }
@@ -358,8 +728,6 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
     }
   }
 
-  // Number inputs show "" for 0 so the field reads as empty when cleared.
-  // Text inputs show their string verbatim (empty string already renders empty).
   const displayValue =
     cur.type === "mbti" || cur.type === "dyads"
       ? ""
@@ -369,17 +737,44 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
           : ""
         : ((value as string | undefined) ?? "");
 
-  // Re-measure the textarea when entering a textarea step or when the value
-  // changes (e.g., paste). Auto-resize on input also runs in onChange.
   useEffect(() => {
     if (cur.type === "textarea") autoSizeTextarea(textareaRef.current);
   }, [step, cur.type, displayValue]);
+
+  function switchToTyping() {
+    turn.abort();
+    tts.stop();
+    setInputMode("typing");
+  }
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div className="mark-anchor">
         <Mark onClick={() => onJumpTo("landing")} />
       </div>
+      {inputMode === "voice" && (
+        <button
+          type="button"
+          onClick={switchToTyping}
+          className="btn"
+          style={{
+            position: "absolute",
+            top: 24,
+            right: 24,
+            background: "transparent",
+            border: "1px solid var(--line-soft)",
+            color: "var(--ink-2)",
+            fontFamily: "var(--mono)",
+            fontSize: 11,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            padding: "6px 12px",
+            zIndex: 10,
+          }}
+        >
+          keyboard ↩
+        </button>
+      )}
       <div
         style={{
           flex: 1,
@@ -411,7 +806,17 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
           >
             {cur.label}
           </label>
-          {cur.type === "textarea" ? (
+
+          {isVoice && isSpeechField ? (
+            <VoiceFieldDisplay
+              state={turn.state}
+              level={turn.level}
+              transcript={turn.liveTranscript}
+              awaitingConfirm={pendingTranscript !== null}
+              onConfirm={confirmPending}
+              onRedo={redoPending}
+            />
+          ) : cur.type === "textarea" ? (
             <textarea
               ref={textareaRef}
               className="field auto-grow"
@@ -459,12 +864,15 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
             />
           )}
 
-          {cur.type !== "mbti" && cur.type !== "dyads" && (
+          {!isVoice && cur.type !== "mbti" && cur.type !== "dyads" && (
             <MicButton
               showStatus
               onTranscript={(text) => applyValue(text, "voice")}
               onRecorded={(blob, durationMs) => {
-                onRecorded(blob, durationMs);
+                prime();
+                if (!voiceMode) setVoiceMode(true);
+                pushIntakeSample(blob);
+                pushIntakeSeconds(durationMs / 1000);
                 pushVoiceSample(blob);
               }}
             />
@@ -523,6 +931,136 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
           {step === INTAKE_FIELDS.length - 1 ? "begin →" : "continue →"}
         </button>
       </div>
+    </div>
+  );
+}
+
+const VOICE_STATUS_TEXT: Record<import("../voice/useVoiceTurn").TurnState, string> = {
+  idle: "",
+  speaking: "asking…",
+  listening: "listening…",
+  transcribing: "transcribing…",
+  reprompting: "one more time…",
+  showing: "got it",
+  fallback: "let's type this one",
+};
+
+const VOICE_RING_BG: Record<import("../voice/useVoiceTurn").TurnState, string> = {
+  idle: "var(--bg-3)",
+  speaking: "var(--ink-1)",
+  reprompting: "var(--ink-1)",
+  listening: "var(--accent)",
+  transcribing: "var(--bg-3)",
+  showing: "var(--bg-3)",
+  fallback: "var(--bg-3)",
+};
+
+function VoiceFieldDisplay({
+  state,
+  level,
+  transcript,
+  awaitingConfirm,
+  onConfirm,
+  onRedo,
+}: {
+  state: import("../voice/useVoiceTurn").TurnState;
+  level: number;
+  transcript: string;
+  awaitingConfirm: boolean;
+  onConfirm: () => void;
+  onRedo: () => void;
+}) {
+  const ringScale = 1 + Math.min(level, 1) * 0.5;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 18,
+        padding: "24px 0",
+      }}
+    >
+      <div
+        style={{
+          width: 96,
+          height: 96,
+          borderRadius: "50%",
+          background: awaitingConfirm ? "var(--accent)" : VOICE_RING_BG[state],
+          transform: `scale(${ringScale.toFixed(3)})`,
+          transition: "transform 80ms linear, background 200ms var(--ease)",
+          opacity: state === "idle" && !awaitingConfirm ? 0.3 : 1,
+        }}
+      />
+      <div
+        className="meta"
+        style={{
+          color: "var(--ink-2)",
+          fontFamily: "var(--mono)",
+          fontSize: 11,
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          minHeight: 14,
+        }}
+      >
+        {awaitingConfirm ? "i heard" : VOICE_STATUS_TEXT[state]}
+      </div>
+      <div
+        className="serif"
+        style={{
+          fontSize: awaitingConfirm ? 32 : 22,
+          fontStyle: "italic",
+          color: "var(--ink-1)",
+          minHeight: 30,
+          textAlign: "center",
+          fontWeight: awaitingConfirm ? 500 : 400,
+          transition: "font-size 200ms var(--ease)",
+        }}
+      >
+        {awaitingConfirm ? `“${transcript}”` : transcript}
+      </div>
+      {awaitingConfirm && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 14,
+            marginTop: 8,
+          }}
+        >
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="btn btn-accent"
+            style={{
+              padding: "16px 32px",
+              fontSize: 16,
+              minWidth: 280,
+              boxShadow: "0 0 0 4px var(--bg-2), 0 0 0 5px var(--accent)",
+            }}
+          >
+            press SPACE or ENTER to confirm
+          </button>
+          <button
+            type="button"
+            onClick={onRedo}
+            className="btn"
+            style={{
+              padding: "10px 20px",
+              fontSize: 13,
+              background: "transparent",
+              border: "1px solid var(--line-soft)",
+              color: "var(--ink-2)",
+              fontFamily: "var(--mono)",
+              letterSpacing: "0.08em",
+            }}
+          >
+            press R to redo
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -807,16 +1345,16 @@ export function ScreenProcessing({
   }, []);
 
   const phase = PHASE_TO_STEP[simStreamPhase] ?? 1;
-  // Server phase (`phase`) always advances with the stream. `displayedPhase` is
-  // gated by user advancement: we don't move the right-column UI from phase 1
-  // to phase 2 (or 2 → 3) until the user has acknowledged the gate. Phase 4
-  // (finalizing) is always allowed to display whenever the server reaches it,
-  // because the queue/dock already handles 3 → 4 advancement explicitly.
-  const displayedPhase =
-    phase >= 4
-      ? phase
-      : Math.min(phase, Math.max(1, userUnlockedPhase + 1));
   const isError = simStreamPhase === "error";
+
+  // Fast-forward overrides: when the user presses advance during the staggered
+  // arrival/reveal animations, we collapse the timing locally so they don't
+  // have to wait. The originals (agentArrivedAt, planArrivedAt) are owned by
+  // App.tsx and only set once per stream, so overriding locally is safe.
+  const [arrivalOverride, setArrivalOverride] = useState<Record<string, number> | null>(null);
+  const [planRevealOverride, setPlanRevealOverride] = useState<number | null>(null);
+  const effectiveArrived = arrivalOverride ?? agentArrivedAt;
+  const effectivePlanArrivedAt = planRevealOverride ?? planArrivedAt;
   const startYear = profile.presentYear || 2026;
   const endYear = profile.targetYear || 2046;
 
@@ -864,10 +1402,23 @@ export function ScreenProcessing({
   // still plays immediately).
   const svgActiveIdx = pacedActiveIdx >= 0 ? pacedActiveIdx : activeIdx;
   const svgActive = svgActiveIdx >= 0 ? outline[svgActiveIdx] : active;
+
+  // displayedPhase gates the right-column UI: we don't move it from phase 1 → 2
+  // or 2 → 3 until the user acknowledges. Phase 3 → 4 is held until the user
+  // has actually finished reading every event the queue has produced — otherwise
+  // the server reaching `finalizing` would auto-skip past unread events.
+  const phase3HasUnreadWork =
+    queue.dockState === "revealing" ||
+    queue.dockState === "ready" ||
+    queue.dockState === "waiting";
+  const displayedPhase =
+    phase >= 4 && !phase3HasUnreadWork
+      ? phase
+      : Math.min(phase, Math.max(1, userUnlockedPhase + 1));
   // ---- per-frame derivations (cheap; no useMemo because `now` invalidates every tick) ----
 
   function arrivalAlpha(agentId: string): number {
-    const t = agentArrivedAt[agentId];
+    const t = effectiveArrived[agentId];
     if (t === undefined) return 0;
     return clamp((now - t) / ARRIVAL_FADE_MS, 0, 1);
   }
@@ -884,7 +1435,7 @@ export function ScreenProcessing({
   // per frame, so the edge and node `<g>` blocks share derivations.
   const decoratedNodes = layout
     .map((n) => {
-      const arrivedAt = agentArrivedAt[n.agent.agent_id];
+      const arrivedAt = effectiveArrived[n.agent.agent_id];
       if (arrivedAt === undefined || now < arrivedAt) return null;
       const w = agentWeight[n.agent.agent_id] || 0;
       const pulse = activePulse(n.agent.agent_id);
@@ -956,8 +1507,8 @@ export function ScreenProcessing({
       return "streaming";
     }
     if (displayedPhase === 2) {
-      if (planArrivedAt === null) return "streaming";
-      const lastRevealAt = planArrivedAt + 600 + (outline.length - 1) * PLAN_REVEAL_MS;
+      if (effectivePlanArrivedAt === null) return "streaming";
+      const lastRevealAt = effectivePlanArrivedAt + 600 + (outline.length - 1) * PLAN_REVEAL_MS;
       return now >= lastRevealAt ? "ready" : "revealing";
     }
     if (displayedPhase === 3) return queue.dockState;
@@ -973,8 +1524,27 @@ export function ScreenProcessing({
       onContinue();
       return;
     }
-    if (displayedPhase === 1 || displayedPhase === 2) {
-      setUserUnlockedPhase(displayedPhase);
+    if (displayedPhase === 1) {
+      const ds = dockState();
+      if (ds === "streaming") {
+        // Collapse the staggered agent arrival so the user sees everyone now.
+        const t = performance.now() - ARRIVAL_FADE_MS - 1;
+        const next: Record<string, number> = {};
+        for (const a of agents) next[a.agent_id] = t;
+        setArrivalOverride(next);
+        return;
+      }
+      setUserUnlockedPhase(1);
+      return;
+    }
+    if (displayedPhase === 2) {
+      const ds = dockState();
+      if (ds === "revealing" && planArrivedAt !== null) {
+        // Collapse the staggered plan reveal so all year hints appear now.
+        setPlanRevealOverride(performance.now() - 600 - outline.length * PLAN_REVEAL_MS - 1);
+        return;
+      }
+      setUserUnlockedPhase(2);
       return;
     }
     if (displayedPhase === 3) {
@@ -1077,12 +1647,25 @@ export function ScreenProcessing({
                   <stop offset="0%" stopColor="oklch(0.74 0.09 65 / 0.35)" />
                   <stop offset="100%" stopColor="oklch(0.74 0.09 65 / 0)" />
                 </radialGradient>
+                <radialGradient id="edge-warm" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="oklch(0.78 0.11 65 / 1)" />
+                  <stop offset="55%" stopColor="oklch(0.74 0.09 65 / 0.85)" />
+                  <stop offset="100%" stopColor="oklch(0.6 0.06 65 / 0.35)" />
+                </radialGradient>
+                <radialGradient id="edge-cool" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="oklch(0.74 0.09 65 / 0.55)" />
+                  <stop offset="60%" stopColor="oklch(0.6 0.04 60 / 0.3)" />
+                  <stop offset="100%" stopColor="oklch(0.45 0.02 55 / 0.12)" />
+                </radialGradient>
                 <filter id="soft-glow" x="-50%" y="-50%" width="200%" height="200%">
                   <feGaussianBlur stdDeviation="2.5" result="blur" />
                   <feMerge>
                     <feMergeNode in="blur" />
                     <feMergeNode in="SourceGraphic" />
                   </feMerge>
+                </filter>
+                <filter id="line-glow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="1.6" />
                 </filter>
               </defs>
 
@@ -1095,10 +1678,10 @@ export function ScreenProcessing({
                   cy={cy}
                   r={r}
                   fill="none"
-                  stroke="var(--line)"
+                  stroke={i === 0 ? "var(--accent-line)" : "var(--ink-4)"}
                   strokeWidth="0.5"
                   strokeDasharray="2 6"
-                  opacity={phase >= 1 ? 0.55 - i * 0.12 : 0}
+                  opacity={phase >= 1 ? 0.7 - i * 0.18 : 0}
                   style={{ transition: "opacity 1.6s var(--ease)" }}
                 />
               ))}
@@ -1106,19 +1689,51 @@ export function ScreenProcessing({
               {decoratedNodes.map((n) => {
                 const driftX = phase === 4 ? (n.x - cx) * 0.25 * finalProgress : 0;
                 const driftY = phase === 4 ? (n.y - cy) * 0.25 * finalProgress : 0;
-                const baseOp = 0.18 + Math.min(0.5, n.w * 0.16);
-                const op = (baseOp + n.pulse * 0.45) * (1 - finalProgress * 0.5);
+                const x2 = n.x + driftX;
+                const y2 = n.y + driftY;
+                const isActiveEdge = n.pulse > 0.05;
+                const baseOp = 0.42 + Math.min(0.45, n.w * 0.18);
+                const op = (baseOp + n.pulse * 0.5) * (1 - finalProgress * 0.5);
+                const stroke = n.w > 0 || isActiveEdge ? "url(#edge-warm)" : "url(#edge-cool)";
+                const sw = 0.9 + Math.min(2.6, n.w * 0.55) + n.pulse * 1.8;
                 return (
-                  <line
-                    key={`edge-${n.agent.agent_id}`}
-                    x1={cx}
-                    y1={cy}
-                    x2={n.x + driftX}
-                    y2={n.y + driftY}
-                    stroke={n.w > 0 ? "var(--accent)" : "var(--ink-3)"}
-                    strokeWidth={0.6 + Math.min(2.4, n.w * 0.45) + n.pulse * 1.5}
-                    opacity={op * n.alpha}
-                  />
+                  <g key={`edge-${n.agent.agent_id}`} opacity={op * n.alpha}>
+                    {isActiveEdge && (
+                      <line
+                        x1={cx}
+                        y1={cy}
+                        x2={x2}
+                        y2={y2}
+                        stroke="var(--accent)"
+                        strokeWidth={sw + 2.4}
+                        opacity={0.18 * n.pulse}
+                        filter="url(#line-glow)"
+                      />
+                    )}
+                    <line
+                      x1={cx}
+                      y1={cy}
+                      x2={x2}
+                      y2={y2}
+                      stroke={stroke}
+                      strokeWidth={sw}
+                      strokeLinecap="round"
+                    />
+                    {isActiveEdge && (
+                      <line
+                        x1={cx}
+                        y1={cy}
+                        x2={x2}
+                        y2={y2}
+                        stroke="var(--accent)"
+                        strokeWidth={Math.max(0.8, sw * 0.55)}
+                        strokeDasharray="3 9"
+                        strokeLinecap="round"
+                        opacity={0.55 + n.pulse * 0.45}
+                        style={{ animation: "dash-flow 1100ms linear infinite" }}
+                      />
+                    )}
+                  </g>
                 );
               })}
 
@@ -1238,7 +1853,7 @@ export function ScreenProcessing({
               activeIdx={svgActiveIdx}
               phase={phase}
               now={now}
-              planArrivedAt={planArrivedAt}
+              planArrivedAt={effectivePlanArrivedAt}
             />
           </div>
         </div>
@@ -1253,9 +1868,67 @@ export function ScreenProcessing({
             position: "relative",
           }}
         >
-          <Meta style={{ marginBottom: 18, color: isError ? "var(--warn)" : undefined }}>
-            {storyHeader}
-          </Meta>
+          {/* Decorative bracket: tiny corner marks tying the right column to the constellation language */}
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              left: -1,
+              top: 0,
+              width: 14,
+              height: 14,
+              borderLeft: "1px solid var(--accent-line)",
+              borderTop: "1px solid var(--accent-line)",
+              opacity: 0.7,
+            }}
+          />
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              left: -1,
+              bottom: 18,
+              width: 14,
+              height: 14,
+              borderLeft: "1px solid var(--accent-line)",
+              borderBottom: "1px solid var(--accent-line)",
+              opacity: 0.5,
+            }}
+          />
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginBottom: 18,
+            }}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: 5,
+                height: 5,
+                transform: "rotate(45deg)",
+                background: isError ? "var(--warn)" : "var(--accent)",
+                boxShadow: isError ? "none" : "0 0 8px var(--accent-line)",
+                flexShrink: 0,
+              }}
+            />
+            <Meta style={{ color: isError ? "var(--warn)" : undefined, margin: 0 }}>
+              {storyHeader}
+            </Meta>
+            <span
+              aria-hidden
+              style={{
+                flex: 1,
+                height: 1,
+                background:
+                  "linear-gradient(to right, var(--line-soft), transparent)",
+                marginLeft: 4,
+              }}
+            />
+          </div>
 
           {isError && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16, animation: "fade-in 600ms var(--ease) both" }}>
@@ -1288,7 +1961,19 @@ export function ScreenProcessing({
           )}
 
           {!isError && displayedPhase === 1 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 14, overflow: "hidden" }}>
+            <div
+              className="scroll-amber"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 14,
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                paddingRight: 14,
+                paddingBottom: 8,
+              }}
+            >
               {decoratedNodes.map((n, i) => (
                 <div
                   key={n.agent.agent_id}
@@ -1336,7 +2021,19 @@ export function ScreenProcessing({
           )}
 
           {!isError && displayedPhase === 2 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, overflow: "hidden" }}>
+            <div
+              className="scroll-amber"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                paddingRight: 14,
+                paddingBottom: 8,
+              }}
+            >
               <div
                 className="serif"
                 style={{
@@ -1350,8 +2047,8 @@ export function ScreenProcessing({
                 A shape, in {endYear - startYear} years —
               </div>
               {outline.map((o, i) => {
-                if (planArrivedAt === null) return null;
-                const at = planArrivedAt + 600 + i * PLAN_REVEAL_MS;
+                if (effectivePlanArrivedAt === null) return null;
+                const at = effectivePlanArrivedAt + 600 + i * PLAN_REVEAL_MS;
                 if (now < at) return null;
                 return (
                   <div
@@ -1688,84 +2385,111 @@ export function ScreenReveal({ onContinue, onJumpTo, profile, simulation }: Scre
           style={{
             minHeight: "100%",
             display: "flex",
-            flexDirection: "column",
+            flexDirection: "row",
+            flexWrap: "wrap",
             alignItems: "center",
             justifyContent: "center",
+            gap: "clamp(24px, 4vw, 64px)",
             padding: "80px 40px 140px",
             boxSizing: "border-box",
           }}
         >
           <div
             style={{
-              width: "min(420px, 32vw)",
-              height: "min(56vh, 560px)",
-              flexShrink: 0,
-              opacity: phase >= 1 ? 1 : 0,
-              transition: "opacity 2200ms var(--ease)",
-            }}
-          >
-            {(() => {
-              const p = nearestPortrait(simulation?.agedPortraits, "high", profile.targetYear);
-              return <PortraitImage src={p?.imageUrl} alt={p ? `you at ${p.age}` : "you"} />;
-            })()}
-          </div>
-
-          <div
-            style={{
-              marginTop: 36,
-              textAlign: "center",
-              opacity: phase >= 2 ? 1 : 0,
-              transition: "opacity 1600ms var(--ease)",
-            }}
-          >
-            <Meta style={{ marginBottom: 14 }}>
-              {profile.name || "Sarah"} · {profile.targetYear || 2046}
-            </Meta>
-          </div>
-
-          <div
-            style={{
+              flex: "1 1 520px",
               maxWidth: 720,
-              margin: "28px auto 0",
-              textAlign: "center",
-              minHeight: 130,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
             }}
           >
-            {phase >= 3 && (
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 14,
-                  marginBottom: 22,
-                  animation: "fade-in 700ms var(--ease) both",
-                }}
-              >
-                <Wave />
-                <span className="meta" style={{ color: "var(--accent)" }}>
-                  future self speaking
-                </span>
-              </div>
-            )}
-            <p
-              className="serif"
+            <div
               style={{
-                fontSize: "clamp(20px, 2.2vw, 26px)",
-                lineHeight: 1.55,
-                fontStyle: "italic",
-                color: "var(--ink)",
-                margin: 0,
-                letterSpacing: "0.003em",
+                width: "min(420px, 32vw)",
+                height: "min(56vh, 560px)",
+                flexShrink: 0,
+                opacity: phase >= 1 ? 1 : 0,
+                transition: "opacity 2200ms var(--ease)",
               }}
             >
-              {streamed}
-              {phase >= 3 && streamed.length < opening.length && (
-                <span className="caret" style={{ height: 22 }}>
-                  &nbsp;
-                </span>
+              {(() => {
+                const p = nearestPortrait(simulation?.agedPortraits, "high", profile.targetYear);
+                return <PortraitImage src={p?.imageUrl} alt={p ? `you at ${p.age}` : "you"} />;
+              })()}
+            </div>
+
+            <div
+              style={{
+                marginTop: 36,
+                textAlign: "center",
+                opacity: phase >= 2 ? 1 : 0,
+                transition: "opacity 1600ms var(--ease)",
+              }}
+            >
+              <Meta style={{ marginBottom: 14 }}>
+                {profile.name || "Sarah"} · {profile.targetYear || 2046}
+              </Meta>
+            </div>
+
+            <div
+              style={{
+                maxWidth: 720,
+                margin: "28px auto 0",
+                textAlign: "center",
+                minHeight: 130,
+              }}
+            >
+              {phase >= 3 && (
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 14,
+                    marginBottom: 22,
+                    animation: "fade-in 700ms var(--ease) both",
+                  }}
+                >
+                  <Wave />
+                  <span className="meta" style={{ color: "var(--accent)" }}>
+                    future self speaking
+                  </span>
+                </div>
               )}
-            </p>
+              <p
+                className="serif"
+                style={{
+                  fontSize: "clamp(20px, 2.2vw, 26px)",
+                  lineHeight: 1.55,
+                  fontStyle: "italic",
+                  color: "var(--ink)",
+                  margin: 0,
+                  letterSpacing: "0.003em",
+                }}
+              >
+                {streamed}
+                {phase >= 3 && streamed.length < opening.length && (
+                  <span className="caret" style={{ height: 22 }}>
+                    &nbsp;
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
+
+          {simulation?.clinicalSummary ? (
+            <div
+              style={{
+                flex: "0 1 360px",
+                display: "flex",
+                justifyContent: "center",
+              }}
+            >
+              <ClinicalCard
+                summary={simulation.clinicalSummary}
+                visible={phase >= 3}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 
