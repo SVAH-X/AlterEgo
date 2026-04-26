@@ -24,9 +24,9 @@ Make the processing phase read like a story being written in real time. The narr
 - Constellation visualization is preserved — not removed, not redesigned.
 - Phase 1 (counting), phase 2 (plan), phase 4 (finalizing) layouts are unchanged. Only phase 3 (events) gets the scroll treatment and the typography pass applies to all four phases' right column.
 
-## Approach: Story Scroll
+## Approach: Story Scroll, paced by the reader
 
-The right column becomes a vertical stream of completed checkpoints. New events flow in from the bottom; older events stay above at reduced opacity. Each event gets a guaranteed minimum dwell before the next can begin its reveal.
+The right column becomes a vertical stream of completed checkpoints. New events flow in from the bottom; older events stay above at reduced opacity. **The user advances at their own pace** — once an event has finished revealing its bubbles, a quiet prompt invites them to press a key (or click) for the next beat. A long inactivity timeout exists only as a demo safety net.
 
 ### Component breakdown
 
@@ -36,17 +36,22 @@ The current right-column body is a phase-conditional `if/else` block. We split p
 2. **`<ScrollEntry>`** — renders one checkpoint as a story beat: year/age stamp, title, then bubbles staggered in. Owns its own animation timing relative to its `revealStartedAt`.
 3. **`<StoryScroll>`** — composes the hook and renders entries in a scrolling column with the latest at the bottom and auto-scroll into view.
 
-### Queue & dwell logic
+### Queue & advance logic
 
 ```
-MIN_DWELL_MS = 4500   // an event holds the floor for at least 4.5s
-BUBBLE_STAGGER_MS = 700   // (was 600 — slowed slightly to match new pacing)
+BUBBLE_STAGGER_MS = 700           // bubble-by-bubble reveal inside the active entry
+READY_HINT_DELAY_MS = 600         // beat between last bubble and the "continue" hint
+INACTIVITY_TIMEOUT_MS = 30_000    // demo safety: auto-advance if no input for 30s
 ```
 
 - `useStoryQueue` keeps a ref'd queue of checkpoints that have arrived from `outline` but haven't started revealing yet.
-- A checkpoint starts revealing when (a) it's first-in-queue, and (b) `now - lastRevealStartedAt >= MIN_DWELL_MS`.
-- Multiple events arriving in a burst all land in the queue; they're paced out one at a time. The constellation graph still pulses immediately on each `filledAt` (it's the "events arriving" indicator), but the text scroll dispenses on its own clock.
-- When the backend finishes (`simStreamPhase === "complete"` or `"finalizing"`) and the queue still has entries, we *flush* — set `MIN_DWELL_MS` to a shorter value (e.g. 1500ms) so the user sees them all before the screen advances.
+- A checkpoint starts revealing when (a) it's first-in-queue, and (b) the user has signalled "advance" (or the inactivity timeout fires).
+- The first event in the simulation auto-starts (no user action needed for the very first beat).
+- Each subsequent event renders its bubbles at `BUBBLE_STAGGER_MS` intervals. When the last bubble lands, after `READY_HINT_DELAY_MS` a small affordance fades in below the entry: a thin underscore line plus `next →` (mono, `--ink-3`).
+- The user advances by pressing **Right Arrow**, **Space**, or **Enter**, or by clicking the `next →` hint. Any of those dispenses the next item from the queue.
+- If the queue is empty (the user is faster than the backend), the hint changes to a quiet ellipsis state (`...`) and the next event auto-starts as soon as it arrives.
+- If the user takes no action for `INACTIVITY_TIMEOUT_MS` after the hint appears, the next event auto-starts. This protects demos and abandoned sessions; the timeout is intentionally long.
+- Multiple events arriving in a burst all land in the queue; the user paces them out. The constellation graph still pulses immediately on every raw `filledAt` so the SVG conveys "things are still arriving" — only the text reveal is gated.
 
 ### Scroll layout
 
@@ -110,18 +115,20 @@ Width bump (360 → 420) gives prose more room to breathe and signals the column
 - During phase 3, the constellation's overall opacity drops slightly (e.g. 0.85) so the text reads as foreground. One-time CSS opacity transition when entering phase 3, no per-frame work.
 - The center node still labels with the user's name, unchanged.
 
-### Auto-advance timing
+### Phase transitions also wait for the user
 
-The existing `useEffect` at `screens-a.tsx:755` advances the screen 1.2–5s after `simStreamPhase === "complete"`. With the queue, we need to also wait for the queue to drain. New rule:
+The same "advance when ready" affordance gates the major phase transitions, not just event-to-event:
 
-```
-advance_at = max(
-  mountedAt + 5000,
-  lastRevealStartedAt + MIN_DWELL_MS + 1200
-)
-```
+- **Phase 1 → 2:** When the cast list has fully appeared in the right column, the `next →` hint shows. User advances to begin phase 2 (visual transition; backend has already streamed the plan).
+- **Phase 2 → 3:** When all plan hints have appeared, the hint shows. User advances to start the events scroll.
+- **Phase 3 → 4 (finalizing):** After the *last* event is rendered AND the backend has emitted `finalizing`/`complete`, the hint shows. User advances into the finalizing meditation.
+- **Phase 4 → next screen (reveal):** The existing "meet yourself →" button is the user's signal here, unchanged. The current 1.2–5s auto-advance is removed. The screen waits for an explicit click.
 
-So if the backend finishes early but the queue still has entries pacing out, we hold until the last one has had its dwell + a 1.2s settling beat.
+The `INACTIVITY_TIMEOUT_MS` safety net applies at every gate.
+
+### Removed: the old auto-advance effect
+
+The existing `useEffect` at `screens-a.tsx:755` (advance to reveal screen 1.2–5s after `complete`) is removed. The user controls the transition. This is the central change in tone — the screen is now patient.
 
 ## Data flow
 
@@ -139,26 +146,40 @@ So if the backend finishes early but the queue still has entries pacing out, we 
 
 `outline` is the source of truth. The hook derives a *paced view* of it for the text column. The graph keeps consuming `outline` directly so visual feedback to the SVG is immediate.
 
+### Keyboard handling
+
+The processing screen currently doesn't intercept keys; the App-level `onKey` handler (`App.tsx:321`) advances screens on `ArrowRight`/`ArrowLeft`. We need to override this *only on the processing screen* and *only while the queue is active*:
+
+- `ArrowRight` / `Space` / `Enter` → dispense next entry in the queue. If the queue is empty AND we're at the final phase-4 gate, fall through to the default screen-advance behavior.
+- `ArrowLeft` → unchanged; user can still navigate back if they want.
+
+Implementation: the screen attaches its own keydown listener at `document` level, calls `e.stopPropagation()` and `e.preventDefault()` when it consumes the key. Cleanup on unmount.
+
 ## Error handling
 
 - The error branch (`isError`) is unchanged — it shows the existing error panel, no scroll, no queue.
-- If the queue has unrendered entries when an error arrives, we flush them at the accelerated rate and then show the error banner above the scroll.
+- If the queue has unrendered entries when an error arrives, the existing entries stay rendered with their normal manual-advance behavior so the user can still page through what arrived. The error banner appears above the scroll.
 
 ## Testing
 
-- **Manual / browser:** `npm run dev`, run a simulation end-to-end, watch phase 3.
-  - Verify: each event holds the floor for ~4.5s, no event is overwritten mid-reveal.
+- **Manual / browser:** `npm run dev`, run a simulation end-to-end.
+  - Verify: phase 1 → all agents appear, hint shows, pressing Right advances to phase 2.
+  - Verify: phase 2 → all hints appear, hint shows, pressing Space advances to phase 3.
+  - Verify: phase 3 → first event auto-reveals, subsequent events wait for user input. No event is overwritten mid-reveal regardless of how fast the backend streams.
+  - Verify: clicking `next →` and pressing Enter/Space/Right all advance.
   - Verify: older events remain visible above, faded.
   - Verify: text on the right reads as the focal element, not a sidebar.
-  - Verify: when backend finishes fast, queue still drains gracefully before screen auto-advances.
+  - Verify: 30s of inactivity at any gate auto-advances (test by waiting).
+  - Verify: ArrowLeft still navigates back to a previous screen as before.
 - **Typecheck:** `npm run typecheck` must pass clean.
 - **No new unit tests** — the project does not currently have a frontend test harness; adding one is out of scope.
 
 ## Files changed
 
-- `frontend/src/screens/screens-a.tsx` — extract phase-3 right-column into `StoryScroll`, `ScrollEntry`, add `useStoryQueue` hook, update typography in phase-1/2/4 right-column blocks, bump grid column width, tweak auto-advance effect, drop constellation opacity at phase 3.
+- `frontend/src/screens/screens-a.tsx` — extract phase-3 right-column into `StoryScroll`, `ScrollEntry`, add `useStoryQueue` hook with manual-advance gating, update typography in all four phases' right-column blocks, bump grid column width, remove the old auto-advance-to-reveal effect, drop constellation opacity at phase 3, attach screen-local keydown handler.
+- `frontend/src/App.tsx` — minor: the screen-local keydown handler needs to win over the App-level Arrow listener while processing is active. Cleanest fix is to have the processing screen call `e.stopPropagation()`/`e.preventDefault()` on consumed keys; no changes to App.
 
-That's it — single file. The file is already large (~1500 lines); we'll add ~150 lines net and may extract the new pieces to a sibling file `frontend/src/screens/processing-story.tsx` if it keeps the parent file from growing past comprehensibility. Decision deferred to implementation: if the new code lands cleanly under 100 lines, keep inline; if larger, split.
+That's it — effectively a single file. The file is already large (~1500 lines); we'll add ~200 lines net and may extract the new pieces to a sibling file `frontend/src/screens/processing-story.tsx` if it keeps the parent file from growing past comprehensibility. Decision deferred to implementation: if the new code lands cleanly under 120 lines, keep inline; if larger, split.
 
 ## Open questions
 
