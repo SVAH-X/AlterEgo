@@ -602,16 +602,13 @@ async def _fan_out_portraits_branched(
     by_year_high = {p.year: p for p in original_portraits if p.trajectory == "high"}
     sem = _portrait_sem()
 
+    # Pre-intervention high portraits stay in the frontend's existing state
+    # — we don't re-emit them. We just track the indices so the regeneration
+    # loop below knows to skip them.
     preserved_indices: set[int] = set()
     for i, _age in enumerate(ages):
         year = profile.presentYear + round(span * (i / 4))
         if year < iv_year and year in by_year_high:
-            yield {
-                "phase": "portrait",
-                "trajectory": "high",
-                "index": i,
-                "portrait": by_year_high[year].model_dump(),
-            }
             preserved_indices.add(i)
 
     async def _one(index: int, age: int) -> dict:

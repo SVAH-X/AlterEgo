@@ -522,10 +522,17 @@ export function ScreenTimeline({
         } else if (ev.phase === "finalizing") {
           setRewriting((r) => (r ? { ...r, phase: "stitching it together" } : null));
         } else if (ev.phase === "complete") {
-          // Reset agedPortraits to [] in the freshly-completed simulation;
-          // post-complete portrait events below will fill them in via
-          // mergePortrait, mirroring the App-level runSimulate flow.
-          setSimulation({ ...ev.simulation, agedPortraits: [] });
+          // The backend no longer re-emits pre-intervention high portraits to
+          // save upload bytes — it strips them out. We retain the originals
+          // locally and re-merge them here so the slider/encore screens still
+          // have early-life faces.
+          const preservedHigh = (originalSim.agedPortraits ?? []).filter(
+            (p) => p.trajectory === "high" && p.year < cp.year,
+          );
+          setSimulation({
+            ...ev.simulation,
+            agedPortraits: [...preservedHigh, ...ev.simulation.agedPortraits],
+          });
           setRewriting(null);
           // Drop the user at the end of the new trajectory, no replay — they
           // just watched it materialize. They can scrub or intervene again.
