@@ -493,10 +493,10 @@ Good: "The years aren't the unit. The unit is what you stopped noticing."
    - "What did I get wrong?"
    - "Am I happy?"
    - "What should I change?"
-   Each value: 35–60 words. In the future-self voice. Specific. Reference \
-events from the trajectory by detail (not by name). For "What should I \
-change?" give 1–3 concrete actionable nudges grounded in the trajectory, \
-not generic advice. Distilled, not clipped.
+   Each value: 15–30 words. Two or three short sentences. In the future-self \
+voice. Specific. Reference one event from the trajectory by detail (not by \
+name). For "What should I change?" give one concrete actionable nudge \
+grounded in the trajectory, not generic advice. Brief.
 
 {TONE_BLOCK}
 
