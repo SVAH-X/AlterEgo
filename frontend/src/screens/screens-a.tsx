@@ -872,28 +872,17 @@ export function ScreenProcessing({
   const cx = GRAPH_W / 2;
   const cy = GRAPH_H / 2;
 
-  function dockStateForScreen({
-    displayedPhase,
-    isError,
-    queue,
-    now: _now,
-  }: {
-    displayedPhase: number;
-    isError: boolean;
-    queue: ReturnType<typeof useStoryQueue>;
-    now: number;
-  }): DockState {
+  function dockState(): DockState {
     if (isError) return "final";
     if (displayedPhase === 1) {
-      const arrivedCount = decoratedNodes.length;
       const total = layout.length || 0;
-      if (total > 0 && arrivedCount >= total) return "ready";
+      if (total > 0 && decoratedNodes.length >= total) return "ready";
       return "streaming";
     }
     if (displayedPhase === 2) {
       if (planArrivedAt === null) return "streaming";
-      const lastRevealAt = planArrivedAt + 600 + (outline.length - 1) * 700;
-      return _now >= lastRevealAt ? "ready" : "revealing";
+      const lastRevealAt = planArrivedAt + 600 + (outline.length - 1) * PLAN_REVEAL_MS;
+      return now >= lastRevealAt ? "ready" : "revealing";
     }
     if (displayedPhase === 3) return queue.dockState;
     if (displayedPhase === 4) {
@@ -925,6 +914,10 @@ export function ScreenProcessing({
     }
   }
 
+  // Re-bind the latest handler via a ref so the document keydown listener
+  // attaches once, not on every rAF tick.
+  const handleAdvanceRef = useRef(handleAdvance);
+  handleAdvanceRef.current = handleAdvance;
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
@@ -932,12 +925,12 @@ export function ScreenProcessing({
       if (e.key === "ArrowRight" || e.key === " " || e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
-        handleAdvance();
+        handleAdvanceRef.current();
       }
     }
     document.addEventListener("keydown", onKey, true);
     return () => document.removeEventListener("keydown", onKey, true);
-  });
+  }, []);
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
@@ -1308,9 +1301,7 @@ export function ScreenProcessing({
           )}
 
           {!isError && displayedPhase === 3 && (
-            <div style={{ display: "flex", flexDirection: "column", minHeight: 0, flex: 1 }}>
-              <StoryScroll visible={queue.visible} now={now} />
-            </div>
+            <StoryScroll visible={queue.visible} now={now} />
           )}
 
           {!isError && displayedPhase === 4 && (
@@ -1362,11 +1353,7 @@ export function ScreenProcessing({
             </div>
           )}
 
-          <AdvanceDock
-            state={dockStateForScreen({ displayedPhase, isError, queue, now })}
-            now={now}
-            onAdvance={handleAdvance}
-          />
+          <AdvanceDock state={dockState()} now={now} onAdvance={handleAdvance} />
         </div>
       </div>
 

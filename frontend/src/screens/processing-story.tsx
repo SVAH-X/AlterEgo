@@ -1,18 +1,16 @@
-// frontend/src/screens/processing-story.tsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { clamp } from "../atoms";
 import type { AgentSpec, Checkpoint } from "../types";
 import type { FilledOutline } from "../App";
 
-// ----- timing -----
 export const BUBBLE_STAGGER_MS = 700;
 export const READY_HINT_DELAY_MS = 600;
 export const INACTIVITY_TIMEOUT_MS = 30_000;
 export const ENTRY_FADE_MS = 600;
 
-// ----- types -----
 export interface Bubble {
-  who: string; // "narrator" | agent name
+  who: string;
   line: string;
 }
 
@@ -31,8 +29,6 @@ export type DockState =
   | "waiting"     // queue empty; backend hasn't produced next event yet
   | "final";      // last event done AND backend complete; advance leaves the screen
 
-// makeBubbles is currently a private helper inside screens-a.tsx. We re-implement
-// it here (the logic is identical) so processing-story.tsx is self-contained.
 function makeBubbles(
   cp: Checkpoint,
   agents: AgentSpec[],
@@ -116,32 +112,23 @@ export function useStoryQueue({
         checkpoint: o.checkpoint,
         primary_actors: o.primary_actors,
         bubbles: makeBubbles(o.checkpoint, agents, o.primary_actors),
-        revealStartedAt: 0, // set when dispensed
+        revealStartedAt: 0,
       };
       queueRef.current.push(entry);
     });
-    // Trigger a re-render so the dock can update hasNext.
-    setVisible((v) => v);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outline, agents]);
 
-  const dispense = useMemo(
-    () => () => {
-      const next = queueRef.current.shift();
-      if (!next) return;
-      next.revealStartedAt = performance.now();
-      setVisible((v) => [...v, next]);
-    },
-    [],
-  );
+  const dispense = useCallback(() => {
+    const next = queueRef.current.shift();
+    if (!next) return;
+    next.revealStartedAt = performance.now();
+    setVisible((v) => [...v, next]);
+  }, []);
 
-  const advance = useMemo(
-    () => () => {
-      setLastInputAt(performance.now());
-      dispense();
-    },
-    [dispense],
-  );
+  const advance = useCallback(() => {
+    setLastInputAt(performance.now());
+    dispense();
+  }, [dispense]);
 
   // Auto-start the first event so the screen doesn't open on a static prompt.
   useEffect(() => {
@@ -152,9 +139,6 @@ export function useStoryQueue({
     dispense();
   }, [outline, active, dispense]);
 
-  // Inactivity timeout. Only fires when (a) we have a queued entry to dispense,
-  // and (b) the current entry has finished its bubble reveal at least
-  // INACTIVITY_TIMEOUT_MS ago, and (c) no input since.
   const current = visible[visible.length - 1] ?? null;
   const currentBubbleCount = current?.bubbles.length ?? 0;
   const currentRevealEndsAt =
@@ -163,12 +147,19 @@ export function useStoryQueue({
         currentBubbleCount * BUBBLE_STAGGER_MS +
         READY_HINT_DELAY_MS
       : 0;
-  const idleSince = Math.max(currentRevealEndsAt, lastInputAt);
+
+  // Demo-safety auto-dispense if the user goes idle. Scheduled once per
+  // (current entry, last input) pair instead of polled every rAF tick.
   useEffect(() => {
-    if (queueRef.current.length === 0) return;
-    if (now - idleSince < INACTIVITY_TIMEOUT_MS) return;
-    dispense();
-  }, [now, idleSince, dispense]);
+    if (current === null) return;
+    const idleStart = Math.max(currentRevealEndsAt, lastInputAt);
+    const delay = Math.max(0, idleStart + INACTIVITY_TIMEOUT_MS - performance.now());
+    const t = window.setTimeout(() => {
+      if (queueRef.current.length === 0) return;
+      dispense();
+    }, delay);
+    return () => window.clearTimeout(t);
+  }, [current, currentRevealEndsAt, lastInputAt, dispense]);
 
   const hasNext = queueRef.current.length > 0;
   const drained =
@@ -176,7 +167,6 @@ export function useStoryQueue({
     outline.length > 0 &&
     outline.every((o) => o.filled);
 
-  // Dock state derivation.
   let dockState: DockState;
   if (current === null) {
     dockState = "streaming";
@@ -244,8 +234,6 @@ export function AdvanceDock({
   const interactive = DOCK_INTERACTIVE[state];
   const text = label ?? DOCK_LABELS[state];
 
-  // Underline pulse: opacity 0.3 → 1.0 → 0.3 over 1.6s when interactive,
-  // static 0.4 otherwise. Computed off `now` so it shares the screen's rAF tick.
   const pulse = interactive
     ? 0.3 + 0.7 * (0.5 + 0.5 * Math.sin((now / 1600) * Math.PI * 2))
     : 0.4;
@@ -324,16 +312,14 @@ export function ScrollEntryView({ entry, rank, age, now }: ScrollEntryProps) {
   const opacity =
     RECENCY_OPACITY[Math.min(rank, RECENCY_OPACITY.length - 1)];
 
-  // Only the active entry reveals bubbles; older entries collapse to title.
   const visibleBubbles = isActive
     ? entry.bubbles.filter(
         (_, i) => now - entry.revealStartedAt >= i * BUBBLE_STAGGER_MS,
       )
     : [];
 
-  const sinceMount = now - entry.revealStartedAt;
-  const enterAlpha = Math.max(0, Math.min(1, sinceMount / ENTRY_FADE_MS));
-  const enterShift = (1 - enterAlpha) * 14; // px translateY from below
+  const enterAlpha = clamp((now - entry.revealStartedAt) / ENTRY_FADE_MS, 0, 1);
+  const enterShift = (1 - enterAlpha) * 14;
 
   return (
     <div
@@ -424,7 +410,6 @@ export interface StoryScrollProps {
 export function StoryScroll({ visible, now }: StoryScrollProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-scroll the active entry into view at the bottom.
   useEffect(() => {
     if (!containerRef.current) return;
     containerRef.current.scrollTop = containerRef.current.scrollHeight;
