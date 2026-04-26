@@ -9,6 +9,9 @@ Phases:
 
 from typing import Optional
 
+import json
+import re
+
 from app.models.checkpoint import Checkpoint
 from app.models.orchestration import AgentSpec, OutlineEvent
 from app.models.profile import Profile, VALID_VALUES_DYADS
@@ -645,3 +648,93 @@ def _health_block(profile: Profile) -> str:
         out.append("  Mind:")
         out.extend(mind_lines)
     return "\n".join(out)
+
+
+# ---------------------------------------------------------------------------
+# CLINICAL SUMMARY — final card that ships in the reveal.
+
+CLINICAL_SUMMARY_SYSTEM = f"""\
+You are the clinical-summary agent for AlterEgo. The simulation has run; the \
+person has lived through the trajectory. Your job is to write the short, honest \
+read-out that appears next to their future-self portrait.
+
+Output 2 to 3 modifiable risk factors. Mix freely across body and mind: sleep \
+debt, sedentary baseline, alcohol load, chronic stress, low mood, isolation, \
+overwork — pick whichever 2 to 3 are most load-bearing for THIS run, grounded \
+in the events that fired and the user's stated health background. Don't list \
+things that didn't matter for this trajectory.
+
+Each risk factor is one short label and one one-sentence consequence. The \
+consequence must reference something that actually happened in the trajectory \
+(an event, a relationship beat) rather than generic warnings.
+
+Then output finalHealthState: one of "stable", "strained", "critical". Pick \
+based on the cumulative state the trajectory ended in, not on a single event.
+
+{TONE_BLOCK}
+
+# Output (strict JSON, no prose, no code fence)
+
+{{
+  "riskFactors": [
+    {{"label": "short label, ≤4 words", "consequence": "one sentence, ≤22 words"}},
+    ...
+  ],
+  "finalHealthState": "stable" | "strained" | "critical"
+}}
+
+Rules:
+- Exactly 2 or 3 entries in riskFactors.
+- finalHealthState is exactly one of the three allowed strings.
+- No motivational language. Honest, contemplative, direct.
+"""
+
+
+def render_clinical_user(
+    profile: Profile,
+    checkpoints: list[Checkpoint],
+    final_state_hint: str,
+) -> str:
+    cps = "\n".join(
+        f"  {c.year} (age {c.age}): {c.title}. {c.event} {c.did} {c.consequence}"
+        for c in checkpoints
+    )
+    return f"""\
+Profile:
+- {profile.name}, age {profile.age} → {profile.targetYear}
+- top goal at start: {profile.topGoal}
+- top fear at start: {profile.topFear}{_health_block(profile)}
+
+Lived trajectory:
+{cps}
+
+Final-state hint (from the simulation's state vector): {final_state_hint}
+
+Output the JSON object only."""
+
+
+def parse_clinical_summary(raw: str) -> Optional["ClinicalSummary"]:
+    """Parse the model's clinical-summary response. Returns None on any
+    failure — the orchestrator treats that as 'no clinical card' and the
+    reveal screen stacks back to its single-column layout."""
+    from app.models.clinical import ClinicalSummary  # local import: avoid cycle
+
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.lower().startswith("json"):
+            text = text[4:].lstrip()
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        m = re.search(r"\{.*\}", text, flags=re.DOTALL)
+        if not m:
+            return None
+        try:
+            data = json.loads(m.group(0))
+        except json.JSONDecodeError:
+            return None
+    try:
+        return ClinicalSummary.model_validate(data)
+    except Exception:
+        return None
