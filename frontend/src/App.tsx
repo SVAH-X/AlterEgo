@@ -22,6 +22,7 @@ import {
   ScreenTimeline,
 } from "./screens/screens-b";
 import { ScreenSelfie } from "./screens/screen-selfie";
+import { ScreenModeSelect } from "./screens/screen-mode-select";
 import { VoiceModeToggle } from "./voice/VoiceModeToggle";
 import { useVoice } from "./voice/VoiceContext";
 import { deleteVoice } from "./lib/voice";
@@ -88,13 +89,14 @@ interface ScreenDef {
 const SCREENS: ScreenDef[] = [
   { key: "landing", component: ScreenLanding, label: "01 cold open" },
   { key: "selfie", component: ScreenSelfie, label: "02 selfie" },
-  { key: "intake", component: ScreenIntake, label: "03 intake" },
-  { key: "health", component: ScreenHealth, label: "04 health" },
-  { key: "processing", component: ScreenProcessing, label: "05 processing" },
-  { key: "reveal", component: ScreenReveal, label: "06 reveal" },
-  { key: "timeline", component: ScreenTimeline, label: "07 timeline" },
-  { key: "chat", component: ScreenChat, label: "08 chat" },
-  { key: "end", component: ScreenEnd, label: "09 end" },
+  { key: "modeSelect", component: ScreenModeSelect, label: "03 mode" },
+  { key: "intake", component: ScreenIntake, label: "04 intake" },
+  { key: "health", component: ScreenHealth, label: "05 health" },
+  { key: "processing", component: ScreenProcessing, label: "06 processing" },
+  { key: "reveal", component: ScreenReveal, label: "07 reveal" },
+  { key: "timeline", component: ScreenTimeline, label: "08 timeline" },
+  { key: "chat", component: ScreenChat, label: "09 chat" },
+  { key: "end", component: ScreenEnd, label: "10 end" },
 ];
 
 const PRESENT_YEAR = new Date().getFullYear();
@@ -125,7 +127,7 @@ function humanizeSimError(message: string): string {
 }
 
 export default function App() {
-  const { clonedVoiceId, setClonedVoiceId, clearIntakeSamples } = useVoice();
+  const { clonedVoiceId, setClonedVoiceId, clearIntakeSamples, setInputMode } = useVoice();
   const [idx, setIdx] = useState(0);
   const [prevIdx, setPrevIdx] = useState<number | null>(null);
   const prevTimerRef = useRef<number | null>(null);
@@ -200,6 +202,7 @@ export default function App() {
     if (clonedVoiceId) deleteVoice(clonedVoiceId);
     setClonedVoiceId(null);
     clearIntakeSamples();
+    setInputMode(null);
     setSimulationState(null);
     setTimelineViewed(false);
     setSelfieUploaded(false);
