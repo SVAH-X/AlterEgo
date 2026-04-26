@@ -364,10 +364,11 @@ export function ScreenTimeline({
     phase: string;
     newCheckpoints: Checkpoint[];
   } | null>(null);
-  // Spans the full regeneration pipeline (from intervention submit through the
-  // last post-complete portrait event), so the portrait overlay stays up while
-  // new faces are still streaming in even after `rewriting` clears.
-  const [regenerating, setRegenerating] = useState(false);
+  // Outlives `rewriting` (which clears at phase: complete) so the overlay
+  // stays up while post-complete portrait events still stream in. Stores the
+  // intervention year so the overlay can be suppressed over preserved
+  // pre-intervention faces.
+  const [regeneratingFromYear, setRegeneratingFromYear] = useState<number | null>(null);
   const currentYear = Math.round(startYear + t * span);
   const currentAge = baseAge + (currentYear - startYear);
 
@@ -427,14 +428,17 @@ export function ScreenTimeline({
     // preserve pre-intervention checkpoints. Fall back to AE_DATA if the
     // live simulation didn't land (rare — chat would have shown the same).
     const originalSim = simulation ?? AE_DATA;
+    // Backend skips regenerating these — keep them in state so they stay
+    // visible during the rewrite instead of flickering out and back in.
+    const preservedHigh = (originalSim.agedPortraits ?? []).filter(
+      (p) => p.trajectory === "high" && p.year < cp.year,
+    );
     setIntervening(null);
-    setRegenerating(true);
+    setRegeneratingFromYear(cp.year);
     setRewriting({ year: cp.year, fromIdx: idx, phase: "preparing", newCheckpoints: [] });
-    // Drop the stale aged portraits immediately — we don't want the user
-    // staring at their old future face while the new path is being written.
-    // setSimulation resets timelineViewed; restore it on the same tick.
     if (simulation) {
-      setSimulation({ ...simulation, agedPortraits: [] });
+      // setSimulation resets timelineViewed; restore it on the same tick.
+      setSimulation({ ...simulation, agedPortraits: preservedHigh });
       setTimelineViewed(true);
     }
     try {
@@ -464,12 +468,9 @@ export function ScreenTimeline({
           setRewriting((r) => (r ? { ...r, phase: "stitching it together" } : null));
         } else if (ev.phase === "complete") {
           // The backend no longer re-emits pre-intervention high portraits to
-          // save upload bytes — it strips them out. We retain the originals
-          // locally and re-merge them here so the slider/encore screens still
-          // have early-life faces.
-          const preservedHigh = (originalSim.agedPortraits ?? []).filter(
-            (p) => p.trajectory === "high" && p.year < cp.year,
-          );
+          // save upload bytes — it strips them out. We re-merge the preserved
+          // ones (already kept in state on submit) so the slider/encore screens
+          // still have early-life faces.
           setSimulation({
             ...ev.simulation,
             agedPortraits: [...preservedHigh, ...ev.simulation.agedPortraits],
@@ -501,7 +502,7 @@ export function ScreenTimeline({
       console.error("branch stream failed:", e);
     } finally {
       setRewriting((r) => (r ? null : r)); // clear if not already cleared
-      setRegenerating(false);
+      setRegeneratingFromYear(null);
     }
   }
 
@@ -572,9 +573,14 @@ export function ScreenTimeline({
         >
           {(() => {
             const p = nearestPortrait(simulation?.agedPortraits, "high", currentYear, Infinity);
-            return <PortraitImage src={p?.imageUrl} alt={p ? `you at ${p.age}` : "you"} />;
-          })()}
-          {regenerating && (
+            // Suppress the sweep over preserved pre-intervention faces.
+            const showSweep =
+              regeneratingFromYear !== null &&
+              (!p || p.year >= regeneratingFromYear);
+            return (
+              <>
+                <PortraitImage src={p?.imageUrl} alt={p ? `you at ${p.age}` : "you"} />
+                {showSweep && (
             <div
               aria-live="polite"
               style={{
@@ -640,7 +646,10 @@ export function ScreenTimeline({
                 </div>
               </div>
             </div>
-          )}
+                )}
+              </>
+            );
+          })()}
         </div>
         <div style={{ textAlign: "center" }}>
           <div
