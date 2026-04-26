@@ -23,10 +23,13 @@ async def reply(req: ChatRequest) -> str:
     messages.append({"role": "user", "content": req.user_text})
 
     router = get_router()
-    return await router.complete(
-        tier=Tier.HIGH_SIGNAL,  # Sonnet for chat — cheaper, faster turns
-        system=system,
-        messages=messages,
-        max_tokens=600,
-        temperature=0.8,
-    )
+    try:
+        return await router.complete(
+            tier=Tier.HIGH_SIGNAL,  # Sonnet for chat — cheaper, faster turns
+            system=system,
+            messages=messages,
+            max_tokens=600,
+            temperature=0.8,
+        )
+    except Exception as e:  # noqa: BLE001
+        raise ChatError(f"chat completion failed: {e}") from e

@@ -1,11 +1,18 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+_BACKEND_DIR = Path(__file__).resolve().parents[1]
+_REPO_DIR = _BACKEND_DIR.parent
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=("../.env", ".env"),
+        # Load both backend-local and repo-root env files regardless of CWD.
+        # Order matters: later files override earlier ones.
+        env_file=(str(_REPO_DIR / ".env"), str(_BACKEND_DIR / ".env")),
         env_file_encoding="utf-8",
         extra="ignore",
     )
