@@ -63,7 +63,7 @@ def initial_state(profile: Profile) -> State:
     # Health strain: scaling with overwork plus a small age baseline.
     overwork = max(0.0, profile.workHours - 40) / 30.0
     age_baseline = max(0.0, profile.age - 25) * 0.005
-    health_strain = _clamp(0.2 + overwork * 0.3 + age_baseline)
+    health_strain = 0.2 + overwork * 0.3 + age_baseline
 
     # Financial pressure: defaults moderate; topFear mentioning money raises it.
     fear_lower = profile.topFear.lower()
@@ -84,16 +84,54 @@ def initial_state(profile: Profile) -> State:
     # Social isolation: rises with work intensity.
     social_isolation = 0.3 + max(0.0, work_intensity - 0.6) * 0.3
 
+    # Apply optional health-intake deltas. None values contribute nothing.
+    health_strain += _SLEEP_HEALTH_DELTA.get(profile.sleepHours, 0.0)
+    health_strain += _EXERCISE_HEALTH_DELTA.get(profile.exerciseDays, 0.0)
+    health_strain += _CAFFEINE_HEALTH_DELTA.get(profile.caffeineCups, 0.0)
+    health_strain += _ALCOHOL_HEALTH_DELTA.get(profile.alcoholDrinks, 0.0)
+
+    meaning_drift += _STRESS_MEANING_DELTA.get(profile.stressLevel, 0.0)
+    health_strain += _STRESS_HEALTH_DELTA.get(profile.stressLevel, 0.0)
+    meaning_drift += _MOOD_MEANING_DELTA.get(profile.moodBaseline, 0.0)
+    social_isolation += _LONELINESS_SOCIAL_DELTA.get(profile.lonelinessFrequency, 0.0)
+
     return State(
         work_intensity=work_intensity,
         financial_pressure=_clamp(financial_pressure),
         social_isolation=_clamp(social_isolation),
         family_distance=0.3,
-        health_strain=health_strain,
+        health_strain=_clamp(health_strain),
         career_momentum=_clamp(career_momentum),
         meaning_drift=_clamp(meaning_drift),
         relationship_strain=0.3,
     )
+
+
+# Health-intake delta tables. Anything not listed contributes 0.
+_SLEEP_HEALTH_DELTA: dict[str | None, float] = {
+    "<5": 0.15, "5-6": 0.08, "6-7": 0.02, "7-8": -0.05, "8+": -0.03,
+}
+_EXERCISE_HEALTH_DELTA: dict[str | None, float] = {
+    "0": 0.08, "1-2": 0.02, "3-4": -0.05, "5+": -0.10,
+}
+_CAFFEINE_HEALTH_DELTA: dict[str | None, float] = {
+    "3": 0.02, "4+": 0.05,
+}
+_ALCOHOL_HEALTH_DELTA: dict[str | None, float] = {
+    "4-7": 0.02, "8-14": 0.05, "15+": 0.12,
+}
+_STRESS_MEANING_DELTA: dict[str | None, float] = {
+    "moderate": 0.03, "high": 0.08, "severe": 0.15,
+}
+_STRESS_HEALTH_DELTA: dict[str | None, float] = {
+    "high": 0.05, "severe": 0.10,
+}
+_MOOD_MEANING_DELTA: dict[str | None, float] = {
+    "mostly low": 0.12, "mixed": 0.05, "mostly positive": -0.05,
+}
+_LONELINESS_SOCIAL_DELTA: dict[str | None, float] = {
+    "sometimes": 0.05, "often": 0.15,
+}
 
 
 DRIFT_RULES_BLOCK = """\
