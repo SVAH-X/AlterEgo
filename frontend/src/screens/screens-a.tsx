@@ -10,6 +10,7 @@ import { useVoice, useVoicePrimed } from "../voice/VoiceContext";
 import { useTTSPlayer } from "../voice/useTTSPlayer";
 import { MicButton } from "../voice/MicButton";
 import { cloneVoice } from "../lib/voice";
+import { useVoiceTurn } from "../voice/useVoiceTurn";
 import {
   AdvanceDock,
   StoryScroll,
@@ -562,23 +563,83 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
   const [step, setStep] = useState(0);
   const cur = INTAKE_FIELDS[step];
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const { voiceMode, setVoiceMode, prime, pushIntakeSample, pushIntakeSeconds } = useVoice();
+  const {
+    voiceMode,
+    setVoiceMode,
+    prime,
+    pushIntakeSample,
+    pushIntakeSeconds,
+    inputMode,
+    setInputMode,
+  } = useVoice();
   const voicePrimed = useVoicePrimed();
   const tts = useTTSPlayer();
+  const turn = useVoiceTurn();
 
-  // Auto-play the current question when entering voice mode.
+  // Per-step fallback latch: if a voice turn fell back to typing for THIS
+  // question, freeze it as a typed input until the user advances.
+  const [forceTypedField, setForceTypedField] = useState(false);
+
+  const isVoice = inputMode === "voice" && !forceTypedField;
+  const isSpeechField =
+    cur.type === "text" || cur.type === "number" || cur.type === "textarea";
+
+  // Reset the per-field fallback latch when the step changes.
   useEffect(() => {
+    setForceTypedField(false);
+  }, [step]);
+
+  // Typed-mode TTS: read the label aloud (existing behavior preserved).
+  useEffect(() => {
+    if (inputMode === "voice") return; // voice mode owns its own TTS via runTurn
     if (voiceMode && voicePrimed) tts.play(cur.label);
     else tts.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, voiceMode, voicePrimed]);
+  }, [step, voiceMode, voicePrimed, inputMode]);
 
-  function onRecorded(blob: Blob, durationMs: number) {
-    // Keep every clip so users can reach cloning threshold quickly.
-    prime();
-    if (!voiceMode) setVoiceMode(true);
-    pushIntakeSample(blob);
-    pushIntakeSeconds(durationMs / 1000);
+  // Voice-mode driver: run one turn per step; on success, applyValue + next().
+  // For non-speech fields (mbti/dyads), read the label via TTS but don't listen.
+  useEffect(() => {
+    if (inputMode !== "voice") return;
+    let cancelled = false;
+
+    (async () => {
+      if (!isSpeechField) {
+        await tts.playAndWait(cur.label);
+        return;
+      }
+      const result = await turn.runTurn(cur.label);
+      if (cancelled) return;
+      if (result.blob) {
+        pushVoiceSample(result.blob);
+        pushIntakeSample(result.blob);
+        pushIntakeSeconds(result.blob.size / 16000); // rough; size-based estimate
+        prime();
+      }
+      if (result.fellBack) {
+        setForceTypedField(true);
+        return;
+      }
+      if (result.transcript) {
+        applyValue(result.transcript, "voice");
+        // Wait one tick so React commits the new value before advancing.
+        setTimeout(() => {
+          if (!cancelled) advance();
+        }, 50);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      turn.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, inputMode]);
+
+  function advance() {
+    tts.stop();
+    if (step < INTAKE_FIELDS.length - 1) setStep(step + 1);
+    else onContinue();
   }
 
   function next() {
@@ -587,23 +648,14 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
       const allAnswered = cur.dyads.every((d) => Boolean(picks[d.slug]));
       if (!allAnswered) return;
     }
-    tts.stop();
-    if (step < INTAKE_FIELDS.length - 1) setStep(step + 1);
-    else onContinue();
+    advance();
   }
 
-  // For targetYear we display *years ahead* in the input but persist the
-  // absolute year on the profile. Everything downstream still consumes
-  // profile.targetYear as an absolute year.
   const isYearsAheadField = cur.key === "targetYear";
   const value = isYearsAheadField
     ? Math.max(0, profile.targetYear - profile.presentYear)
     : profile[cur.key];
 
-  // One setter for both keystrokes and live transcripts. Voice input on a
-  // number field arrives chatty ("about thirty two years"), so we extract
-  // the first integer; if no digit shows up yet we hold the previous value
-  // instead of clobbering it with 0.
   function applyValue(raw: string, source: "type" | "voice") {
     if (cur.type !== "number") {
       setProfile({ ...profile, [cur.key]: raw });
@@ -615,8 +667,6 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
       if (parsed === null) return;
       n = parsed;
     } else {
-      // Strip anything that isn't a digit so users can't paste
-      // non-numeric content; empty string is allowed (clears field).
       const digits = raw.replace(/[^0-9]/g, "");
       n = digits === "" ? 0 : Number(digits);
     }
@@ -630,8 +680,6 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
     }
   }
 
-  // Number inputs show "" for 0 so the field reads as empty when cleared.
-  // Text inputs show their string verbatim (empty string already renders empty).
   const displayValue =
     cur.type === "mbti" || cur.type === "dyads"
       ? ""
@@ -641,17 +689,44 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
           : ""
         : ((value as string | undefined) ?? "");
 
-  // Re-measure the textarea when entering a textarea step or when the value
-  // changes (e.g., paste). Auto-resize on input also runs in onChange.
   useEffect(() => {
     if (cur.type === "textarea") autoSizeTextarea(textareaRef.current);
   }, [step, cur.type, displayValue]);
+
+  function switchToTyping() {
+    turn.abort();
+    tts.stop();
+    setInputMode("typing");
+  }
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div className="mark-anchor">
         <Mark onClick={() => onJumpTo("landing")} />
       </div>
+      {inputMode === "voice" && (
+        <button
+          type="button"
+          onClick={switchToTyping}
+          className="btn"
+          style={{
+            position: "absolute",
+            top: 24,
+            right: 24,
+            background: "transparent",
+            border: "1px solid var(--line-soft)",
+            color: "var(--ink-2)",
+            fontFamily: "var(--mono)",
+            fontSize: 11,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            padding: "6px 12px",
+            zIndex: 10,
+          }}
+        >
+          keyboard ↩
+        </button>
+      )}
       <div
         style={{
           flex: 1,
@@ -683,7 +758,10 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
           >
             {cur.label}
           </label>
-          {cur.type === "textarea" ? (
+
+          {isVoice && isSpeechField ? (
+            <VoiceFieldDisplay state={turn.state} level={turn.level} transcript={turn.liveTranscript} />
+          ) : cur.type === "textarea" ? (
             <textarea
               ref={textareaRef}
               className="field auto-grow"
@@ -731,12 +809,15 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
             />
           )}
 
-          {cur.type !== "mbti" && cur.type !== "dyads" && (
+          {!isVoice && cur.type !== "mbti" && cur.type !== "dyads" && (
             <MicButton
               showStatus
               onTranscript={(text) => applyValue(text, "voice")}
               onRecorded={(blob, durationMs) => {
-                onRecorded(blob, durationMs);
+                prime();
+                if (!voiceMode) setVoiceMode(true);
+                pushIntakeSample(blob);
+                pushIntakeSeconds(durationMs / 1000);
                 pushVoiceSample(blob);
               }}
             />
@@ -794,6 +875,86 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
         <button className="under" onClick={next}>
           {step === INTAKE_FIELDS.length - 1 ? "begin →" : "continue →"}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function VoiceFieldDisplay({
+  state,
+  level,
+  transcript,
+}: {
+  state: import("../voice/useVoiceTurn").TurnState;
+  level: number;
+  transcript: string;
+}) {
+  const ringScale = 1 + Math.min(level, 1) * 0.5;
+  const statusText =
+    state === "speaking"
+      ? "asking…"
+      : state === "listening"
+        ? "listening…"
+        : state === "transcribing"
+          ? "transcribing…"
+          : state === "reprompting"
+            ? "one more time…"
+            : state === "showing"
+              ? "got it"
+              : state === "fallback"
+                ? "let's type this one"
+                : "";
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 18,
+        padding: "24px 0",
+      }}
+    >
+      <div
+        style={{
+          width: 96,
+          height: 96,
+          borderRadius: "50%",
+          background:
+            state === "listening"
+              ? "var(--accent)"
+              : state === "speaking" || state === "reprompting"
+                ? "var(--ink-1)"
+                : "var(--bg-3)",
+          transform: `scale(${ringScale.toFixed(3)})`,
+          transition: "transform 80ms linear, background 200ms var(--ease)",
+          opacity: state === "idle" ? 0.3 : 1,
+        }}
+      />
+      <div
+        className="meta"
+        style={{
+          color: "var(--ink-2)",
+          fontFamily: "var(--mono)",
+          fontSize: 11,
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          minHeight: 14,
+        }}
+      >
+        {statusText}
+      </div>
+      <div
+        className="serif"
+        style={{
+          fontSize: 22,
+          fontStyle: "italic",
+          color: "var(--ink-1)",
+          minHeight: 30,
+          textAlign: "center",
+        }}
+      >
+        {transcript}
       </div>
     </div>
   );
