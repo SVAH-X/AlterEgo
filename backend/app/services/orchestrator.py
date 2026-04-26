@@ -484,6 +484,12 @@ def _portrait_sem() -> asyncio.Semaphore:
     return _PORTRAIT_SEM
 
 
+def _reset_portrait_sem_for_tests() -> None:
+    """Test-only: clear the cached semaphore so the next caller binds to a fresh loop."""
+    global _PORTRAIT_SEM
+    _PORTRAIT_SEM = None
+
+
 def _hero_portrait_task(
     *,
     profile: Profile,
