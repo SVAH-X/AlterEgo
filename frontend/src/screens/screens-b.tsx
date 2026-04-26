@@ -350,11 +350,10 @@ export function ScreenTimeline({
   const span = endYear - startYear;
   const baseAge = profile.age || 32;
 
-  // On a re-entry (user already watched the auto-play once), drop them at the
-  // end with all cards visible — no replay required. On a first visit (or a
-  // fresh simulation post-intervention), auto-play from year 0.
+  // `t` is driven by scroll position in the right column (or by the slider,
+  // which programmatically scrolls to match). On a re-entry, we initialize
+  // scroll to the bottom so all cards land lit.
   const [t, setT] = useState(timelineViewed ? 1 : 0);
-  const [autoplay, setAutoplay] = useState(!timelineViewed);
   const [intervening, setIntervening] = useState<{ idx: number; text: string } | null>(null);
   // While `rewriting` is non-null, the cells from `fromIdx` onward fade out
   // and a generating placeholder appears; new cells materialize from
@@ -372,61 +371,6 @@ export function ScreenTimeline({
   const currentYear = Math.round(startYear + t * span);
   const currentAge = baseAge + (currentYear - startYear);
 
-  // Build the auto-play schedule: drift between events, linger when one lands.
-  const keyframes = useMemo(() => {
-    const TRANSITION_MS = 2200;  // drift between events
-    const HOLD_MS = 1800;        // linger when an event is reached
-    const frames: { time: number; t: number }[] = [{ time: 0, t: 0 }];
-    let cum = 0;
-    for (const cp of checkpoints) {
-      const frac = (cp.year - startYear) / span;
-      cum += TRANSITION_MS;
-      frames.push({ time: cum, t: frac });
-      cum += HOLD_MS;
-      frames.push({ time: cum, t: frac });
-    }
-    cum += TRANSITION_MS;
-    frames.push({ time: cum, t: 1 });
-    return frames;
-  }, [checkpoints, startYear, span]);
-
-  // Drive `t` along the keyframes via rAF until the user takes over.
-  useEffect(() => {
-    if (!autoplay) return;
-    if (keyframes.length < 2) return;
-
-    const startedAt = Date.now();
-    const totalMs = keyframes[keyframes.length - 1].time;
-    let raf: number;
-
-    const tick = () => {
-      const elapsed = Date.now() - startedAt;
-      if (elapsed >= totalMs) {
-        setT(1);
-        // Auto-play has finished — flag this sim as viewed so subsequent
-        // re-entries skip the replay.
-        setTimelineViewed(true);
-        return; // stop the loop
-      }
-      // Find the segment containing `elapsed` and interpolate t inside it.
-      let prev = keyframes[0];
-      let next = keyframes[keyframes.length - 1];
-      for (let i = 1; i < keyframes.length; i++) {
-        if (keyframes[i].time >= elapsed) {
-          prev = keyframes[i - 1];
-          next = keyframes[i];
-          break;
-        }
-      }
-      const segDur = next.time - prev.time;
-      const segT = segDur === 0 ? 1 : (elapsed - prev.time) / segDur;
-      setT(prev.t + segT * (next.t - prev.t));
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [autoplay, keyframes]);
-
   const activeIdx = useMemo(() => {
     let last = -1;
     checkpoints.forEach((c, i) => {
@@ -435,37 +379,44 @@ export function ScreenTimeline({
     return last;
   }, [currentYear, checkpoints]);
 
-  // Auto-center the active card. Refs are populated by the CheckpointCard's
-  // cardRef prop. `userScrolledRef` flips true the moment the user wheels,
-  // touch-drags, or touches the scrollbar — after that we stop fighting them.
   const cardRefs = useRef<Array<HTMLDivElement | null>>([]);
   const scrollColRef = useRef<HTMLDivElement | null>(null);
-  const userScrolledRef = useRef(false);
+  // Set true just before we programmatically write `scrollTop` (e.g. from the
+  // slider) so the scroll listener doesn't redundantly re-derive `t` from the
+  // value it just produced.
+  const programmaticScrollRef = useRef(false);
 
+  // Page scroll → `t`. Maps scrollTop / (scrollHeight - clientHeight) to [0, 1].
   useEffect(() => {
     const el = scrollColRef.current;
     if (!el) return;
-    const markUser = () => {
-      userScrolledRef.current = true;
+    const onScroll = () => {
+      if (programmaticScrollRef.current) {
+        programmaticScrollRef.current = false;
+        return;
+      }
+      const max = el.scrollHeight - el.clientHeight;
+      if (max <= 0) return;
+      const next = Math.min(1, Math.max(0, el.scrollTop / max));
+      setT(next);
+      setTimelineViewed(true);
     };
-    el.addEventListener("wheel", markUser, { passive: true });
-    el.addEventListener("touchmove", markUser, { passive: true });
-    // Mousedown on the scrollbar gutter doesn't fire wheel; catch it too.
-    el.addEventListener("mousedown", markUser);
-    return () => {
-      el.removeEventListener("wheel", markUser);
-      el.removeEventListener("touchmove", markUser);
-      el.removeEventListener("mousedown", markUser);
-    };
-  }, []);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [setTimelineViewed]);
 
+  // On first mount, if the user has already viewed this timeline, jump scroll
+  // to the bottom so every card lands lit instead of replaying from the top.
   useEffect(() => {
-    if (activeIdx < 0) return;
-    if (userScrolledRef.current) return;
-    const card = cardRefs.current[activeIdx];
-    if (!card) return;
-    card.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [activeIdx]);
+    if (!timelineViewed) return;
+    const el = scrollColRef.current;
+    if (!el) return;
+    const max = el.scrollHeight - el.clientHeight;
+    if (max <= 0) return;
+    programmaticScrollRef.current = true;
+    el.scrollTop = max;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function submitIntervention(idx: number, text: string) {
     const cp = checkpoints[idx];
@@ -477,7 +428,6 @@ export function ScreenTimeline({
     // live simulation didn't land (rare — chat would have shown the same).
     const originalSim = simulation ?? AE_DATA;
     setIntervening(null);
-    setAutoplay(false);
     setRegenerating(true);
     setRewriting({ year: cp.year, fromIdx: idx, phase: "preparing", newCheckpoints: [] });
     // Drop the stale aged portraits immediately — we don't want the user
@@ -526,11 +476,18 @@ export function ScreenTimeline({
           });
           setRewriting(null);
           // Drop the user at the end of the new trajectory, no replay — they
-          // just watched it materialize. They can scrub or intervene again.
-          userScrolledRef.current = false;
+          // just watched it materialize. They can scroll back or intervene
+          // again.
           setT(1);
-          setAutoplay(false);
           setTimelineViewed(true);
+          const el = scrollColRef.current;
+          if (el) {
+            const max = el.scrollHeight - el.clientHeight;
+            if (max > 0) {
+              programmaticScrollRef.current = true;
+              el.scrollTop = max;
+            }
+          }
           // Don't break — keep iterating so post-complete portrait events
           // are merged into the new simulation.
         } else if (ev.phase === "portrait") {
@@ -738,7 +695,6 @@ export function ScreenTimeline({
                       onIntervene={
                         c.year <= currentYear
                           ? () => {
-                              setAutoplay(false);
                               setTimelineViewed(true);
                               setIntervening({ idx: i, text: "" });
                             }
@@ -810,9 +766,7 @@ export function ScreenTimeline({
             marginBottom: 12,
           }}
         >
-          <Meta>
-            {autoplay ? `playing · ${startYear} → ${endYear}` : `scrub · ${startYear} → ${endYear}`}
-          </Meta>
+          <Meta>scrub · {startYear} → {endYear}</Meta>
           <button className="under" onClick={onContinue}>
             meet your future self →
           </button>
@@ -824,12 +778,19 @@ export function ScreenTimeline({
           max={1000}
           value={t * 1000}
           onChange={(e) => {
-            setAutoplay(false); // user takes manual control of time
-            setTimelineViewed(true); // and counts as having seen it
-            // Slider drag means fresh exploration intent — let auto-centering
-            // re-engage so the active card follows the scrub.
-            userScrolledRef.current = false;
-            setT(Number(e.target.value) / 1000);
+            const newT = Number(e.target.value) / 1000;
+            setTimelineViewed(true);
+            setT(newT);
+            // Keep page scroll in lock-step with the slider so the two
+            // controls stay coherent.
+            const el = scrollColRef.current;
+            if (el) {
+              const max = el.scrollHeight - el.clientHeight;
+              if (max > 0) {
+                programmaticScrollRef.current = true;
+                el.scrollTop = newT * max;
+              }
+            }
           }}
           style={{ width: "100%" }}
         />
