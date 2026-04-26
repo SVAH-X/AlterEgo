@@ -530,50 +530,6 @@ Output the JSON object only."""
 
 
 # ---------------------------------------------------------------------------
-# ALTERNATE — checkpointsLow (alternate-hours path), as counterfactual on the high path.
-
-ALTERNATE_SYSTEM = f"""\
-You are the alternate-path agent for AlterEgo. You're given the simulated \
-trajectory the user actually lived (the "high" path — current work hours). \
-Write the alternate trajectory: same length, same span, but the user's work \
-hours dropped to roughly 45/week from the start, and the corresponding life \
-choices followed.
-
-This is NOT a fairy tale. There are still hard moments — a parent's illness, \
-a business setback, a relationship that ends. The good comes earned, not \
-given. Match the original's structure (same number of checkpoints, similar \
-years, parallel themes).
-
-{TONE_BLOCK}
-
-# Output (strict JSON, no prose, no code fence)
-
-[
-  {{ "year": int, "age": int, "title": "...", "event": "...", "did": "...",
-     "consequence": "...", "tone": "warn" | "neutral" | "good" }},
-  ...
-]
-
-Same number of checkpoints as the input. Final checkpoint at the same year. \
-Final tone often "good" but not always — show genuine costs.
-"""
-
-
-def render_alternate_user(profile: Profile, checkpoints: list[Checkpoint]) -> str:
-    cps = "\n".join(
-        f"  {c.year}: {c.title}. {c.event} → {c.consequence}" for c in checkpoints
-    )
-    return f"""\
-Profile:
-- {profile.name}, age {profile.age} → {profile.targetYear}, {profile.workHours} hrs/wk on the original path
-
-Original (high-trajectory) lived events:
-{cps}
-
-Now write the alternate trajectory at ~45 hrs/wk. Output the JSON array only."""
-
-
-# ---------------------------------------------------------------------------
 # Personality prompt blocks (MBTI + values). Empty string when absent so they
 # inline-append safely into existing prompt skeletons.
 
