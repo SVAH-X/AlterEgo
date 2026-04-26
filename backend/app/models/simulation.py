@@ -15,7 +15,9 @@ class SimulationData(BaseModel):
 
     profile: Profile
     agents: list[AgentSpec] = Field(default_factory=list)   # cast of agents in the user's life
-    agedPortraits: list[AgedPortrait]            # up to 5 entries (high trajectory)
+    # Defaults to [] so chat-only paths (e.g. the Fetch.ai agent, which has
+    # no selfie pipeline) can ground replies without supplying portraits.
+    agedPortraits: list[AgedPortrait] = []       # up to 5 entries (high trajectory)
     checkpointsHigh: list[Checkpoint]            # current-trajectory path
     futureSelfOpening: str                       # voiced reveal line
     futureSelfReplies: dict[str, str]            # 3 canned Q→A pairs

@@ -376,14 +376,23 @@ You receive: the profile, the agent list, the FULL outline (so you know what \
 came before and what's still to come), all checkpoints already written, and \
 the batch you must write now.
 
-Each Checkpoint:
-- title: 4–8 words, evocative, no trailing period. Often a definite-article \
-construction ("The promotion you couldn't say no to", "The first cardiologist \
-appointment", "Your sister's wedding, on Zoom").
-- event: 1 sentence. What happened. If agents speak, name them and quote briefly.
-- did: 1 sentence, ≤15 words. What the user did. Specific verb, specific moment.
-- consequence: 1 sentence. What followed. Can be poetic. Lands the moment.
+Each Checkpoint — KEEP IT VERY TIGHT. The agent bundles many cards into one \
+chat message; long cards make the bundle unreadable. Strict per-field budget:
+
+- title: 4–10 words, evocative, no trailing period. Often a definite-article \
+construction ("The promotion you took because you couldn't say no", "The \
+first cardiologist appointment", "Your sister's wedding, on Zoom").
+- event: ONE sentence, ≤18 words. The fact of what happened. No quotes, no \
+metaphor, no scene-setting.
+- did: ONE clause or sentence, ≤10 words. The specific verb. ("Said yes." "Booked the flight." "Didn't call back.")
+- consequence: ONE sentence, ≤18 words. What followed. May be quietly poetic \
+but must land in one breath.
 - tone: "warn" | "neutral" | "good" — match severity (high severity often warn).
+
+HARD CAP: event + did + consequence ≤ 45 words combined. Count them. \
+Cut adjectives, scene-setting, and sub-clauses before you cut beats. \
+Specificity > elaboration. The reader should be able to absorb each card \
+in 5 seconds.
 
 Visibility rule: only agents listed in the event's visibility field can speak \
 or react in that event's narrative. Don't invent reactions from agents who \
