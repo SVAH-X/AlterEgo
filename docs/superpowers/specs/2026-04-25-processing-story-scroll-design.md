@@ -47,10 +47,10 @@ INACTIVITY_TIMEOUT_MS = 30_000    // demo safety: auto-advance if no input for 3
 - `useStoryQueue` keeps a ref'd queue of checkpoints that have arrived from `outline` but haven't started revealing yet.
 - A checkpoint starts revealing when (a) it's first-in-queue, and (b) the user has signalled "advance" (or the inactivity timeout fires).
 - The first event in the simulation auto-starts (no user action needed for the very first beat).
-- Each subsequent event renders its bubbles at `BUBBLE_STAGGER_MS` intervals. When the last bubble lands, after `READY_HINT_DELAY_MS` a small affordance fades in below the entry: a thin underscore line plus `next →` (mono, `--ink-3`).
-- The user advances by pressing **Right Arrow**, **Space**, or **Enter**, or by clicking the `next →` hint. Any of those dispenses the next item from the queue.
-- If the queue is empty (the user is faster than the backend), the hint changes to a quiet ellipsis state (`...`) and the next event auto-starts as soon as it arrives.
-- If the user takes no action for `INACTIVITY_TIMEOUT_MS` after the hint appears, the next event auto-starts. This protects demos and abandoned sessions; the timeout is intentionally long.
+- Each subsequent event renders its bubbles at `BUBBLE_STAGGER_MS` intervals. When the last bubble lands, after `READY_HINT_DELAY_MS` the persistent advance dock (see "The advance affordance" below) flips into its "ready" state.
+- The user advances by pressing **Right Arrow**, **Space**, or **Enter**, or by clicking the dock. Any of those dispenses the next item from the queue.
+- If the queue is empty (the user is faster than the backend), the dock shows a quiet ellipsis state and the next event auto-starts as soon as it arrives.
+- If the user takes no action for `INACTIVITY_TIMEOUT_MS` after the dock enters "ready", the next event auto-starts. This protects demos and abandoned sessions; the timeout is intentionally long.
 - Multiple events arriving in a burst all land in the queue; the user paces them out. The constellation graph still pulses immediately on every raw `filledAt` so the SVG conveys "things are still arriving" — only the text reveal is gated.
 
 ### Scroll layout
@@ -145,6 +145,38 @@ The existing `useEffect` at `screens-a.tsx:755` (advance to reveal screen 1.2–
 ```
 
 `outline` is the source of truth. The hook derives a *paced view* of it for the text column. The graph keeps consuming `outline` directly so visual feedback to the SVG is immediate.
+
+### The advance affordance — obvious but quiet
+
+The user must be able to tell, without instruction, that they are in control of pacing. We achieve this with a **persistent dock** at the bottom of the right column rather than per-entry hints. One predictable place to look. Same design language as the rest of the screen — no buttons, no boxes, no badges.
+
+```
+┌────────────────────────────────┐
+│ ...story scroll above...       │
+│                                │
+├────────────────────────────────┤
+│ ──────                          │  ← thin breathing underline (state cue)
+│ press space  ·  next →         │  ← mono 11px, --ink-2 when ready, --ink-3 when not
+└────────────────────────────────┘
+```
+
+States:
+
+| State                         | Underline                          | Text                                  |
+| ----------------------------- | ---------------------------------- | ------------------------------------- |
+| Streaming (auto, first event) | static, `--ink-3`                  | `streaming`                           |
+| Bubbles revealing             | static, `--ink-3`                  | `revealing`                           |
+| Ready for input               | breathing 1.6s, `--accent` tint    | `press space · next →`                |
+| Queue empty (waiting backend) | static, `--ink-3`                  | `· · ·`                               |
+| Final beat (advance to reveal)| breathing, `--accent`              | `press space · meet yourself →`       |
+
+- The underline is a 24px-wide × 1px line that pulses opacity 0.3 → 1.0 → 0.3 over 1.6s when in a "ready" state. Static (opacity 0.4) otherwise. This is the only continuous animation in the dock — gentle, not flashy.
+- `next →` is clickable; the entire dock area is hover/click-targeted so the user can mouse-click as well as keyboard.
+- `space` is shown rather than `→` because Space is the dominant convention for "advance"; both are bound. Keep the text short.
+- Position: anchored to the bottom of the right column with 18px padding above. Always present from the moment phase 1 begins, so the user sees the dock the entire time and learns its rhythm. It is not "introduced" mid-stream.
+- Color: never above `--ink-2`. Never bold. Never larger than 11px. The dock should feel like the page-number area of a book — present, predictable, ignorable until needed.
+
+This replaces the per-entry `next →` from the earlier draft. Per-entry hints would be repetitive noise; one persistent dock teaches the user the interaction once.
 
 ### Keyboard handling
 
