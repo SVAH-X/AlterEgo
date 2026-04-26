@@ -1,5 +1,6 @@
 // frontend/src/screens/processing-story.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type { AgentSpec, Checkpoint } from "../types";
 import type { FilledOutline } from "../App";
 
@@ -204,4 +205,106 @@ export function useStoryQueue({
     advance,
     lastInputAt,
   };
+}
+
+export interface AdvanceDockProps {
+  state: DockState;
+  /** What the dock prompt should read. Defaults derived from state if omitted. */
+  label?: string;
+  /** Click handler. Should call advance() (or screen-advance for "final"). */
+  onAdvance: () => void;
+  /** Tick clock — the underline pulse animates against this. */
+  now: number;
+  style?: CSSProperties;
+}
+
+const DOCK_LABELS: Record<DockState, string> = {
+  streaming: "streaming",
+  revealing: "revealing",
+  ready: "press space  ·  next →",
+  waiting: "· · ·",
+  final: "press space  ·  meet yourself →",
+};
+
+const DOCK_INTERACTIVE: Record<DockState, boolean> = {
+  streaming: false,
+  revealing: false,
+  ready: true,
+  waiting: false,
+  final: true,
+};
+
+export function AdvanceDock({
+  state,
+  label,
+  onAdvance,
+  now,
+  style,
+}: AdvanceDockProps) {
+  const interactive = DOCK_INTERACTIVE[state];
+  const text = label ?? DOCK_LABELS[state];
+
+  // Underline pulse: opacity 0.3 → 1.0 → 0.3 over 1.6s when interactive,
+  // static 0.4 otherwise. Computed off `now` so it shares the screen's rAF tick.
+  const pulse = interactive
+    ? 0.3 + 0.7 * (0.5 + 0.5 * Math.sin((now / 1600) * Math.PI * 2))
+    : 0.4;
+
+  const color =
+    state === "ready" || state === "final" ? "var(--ink-2)" : "var(--ink-3)";
+  const underlineColor =
+    state === "ready" || state === "final"
+      ? "var(--accent)"
+      : "var(--ink-4, var(--line))";
+
+  return (
+    <div
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : -1}
+      aria-label={interactive ? "advance" : undefined}
+      onClick={interactive ? onAdvance : undefined}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onAdvance();
+              }
+            }
+          : undefined
+      }
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+        paddingTop: 18,
+        paddingBottom: 4,
+        userSelect: "none",
+        cursor: interactive ? "pointer" : "default",
+        ...style,
+      }}
+    >
+      <div
+        style={{
+          width: 24,
+          height: 1,
+          background: underlineColor,
+          opacity: pulse,
+          transition: "background 600ms var(--ease)",
+        }}
+      />
+      <div
+        className="mono"
+        style={{
+          fontSize: 11,
+          letterSpacing: "0.18em",
+          textTransform: "lowercase",
+          color,
+          transition: "color 400ms var(--ease)",
+        }}
+      >
+        {text}
+      </div>
+    </div>
+  );
 }
