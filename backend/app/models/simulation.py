@@ -13,8 +13,7 @@ class SimulationData(BaseModel):
     """
 
     profile: Profile
-    agedPortraits: list[AgedPortrait]            # 10 entries: 5 high + 5 low
-    checkpointsHigh: list[Checkpoint]            # current-trajectory path (6 cards)
-    checkpointsLow: list[Checkpoint]             # alternate-hours path (6 cards)
-    futureSelfOpening: str                       # 25–50 word voiced reveal line
+    agedPortraits: list[AgedPortrait]            # up to 5 entries (high trajectory)
+    checkpointsHigh: list[Checkpoint]            # current-trajectory path
+    futureSelfOpening: str                       # voiced reveal line
     futureSelfReplies: dict[str, str]            # 3 canned Q→A pairs
