@@ -116,6 +116,7 @@ async def transcribe(audio: bytes, filename: str = "audio.webm") -> str:
         result = await client.speech_to_text.convert(
             file=(filename, audio),
             model_id=_STT_MODEL_ID,
+            language_code="en",
         )
     except Exception as e:  # noqa: BLE001 — pass through as VoiceError
         raise VoiceError(_format_provider_error("speech-to-text failed", e)) from e
