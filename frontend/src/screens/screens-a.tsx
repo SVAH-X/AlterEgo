@@ -689,8 +689,7 @@ export function ScreenProcessing({
   runSimulate,
 }: ScreenProps) {
   const [now, setNow] = useState(() => performance.now());
-  const [_userUnlockedPhase, setUserUnlockedPhase] = useState<number>(0);
-  const mountedAtRef = useRef(Date.now());
+  const [userUnlockedPhase, setUserUnlockedPhase] = useState<number>(0);
   const { intakeSamples, intakeSamplesSeconds, setClonedVoiceId } = useVoice();
 
   // Voice cloning runs in parallel with /simulate. Skip if no samples or
@@ -731,15 +730,16 @@ export function ScreenProcessing({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (simStreamPhase !== "complete") return;
-    const elapsed = Date.now() - mountedAtRef.current;
-    const wait = Math.max(1200, 5000 - elapsed);
-    const t = setTimeout(() => onContinue(), wait);
-    return () => clearTimeout(t);
-  }, [simStreamPhase, onContinue]);
-
   const phase = PHASE_TO_STEP[simStreamPhase] ?? 1;
+  // Server phase (`phase`) always advances with the stream. `displayedPhase` is
+  // gated by user advancement: we don't move the right-column UI from phase 1
+  // to phase 2 (or 2 → 3) until the user has acknowledged the gate. Phase 4
+  // (finalizing) is always allowed to display whenever the server reaches it,
+  // because the queue/dock already handles 3 → 4 advancement explicitly.
+  const displayedPhase =
+    phase >= 4
+      ? phase
+      : Math.min(phase, Math.max(1, userUnlockedPhase + 1));
   const isError = simStreamPhase === "error";
   const startYear = profile.presentYear || 2026;
   const endYear = profile.targetYear || 2046;
@@ -865,30 +865,30 @@ export function ScreenProcessing({
   const cy = GRAPH_H / 2;
 
   function dockStateForScreen({
-    phase,
+    displayedPhase,
     isError,
     queue,
     now: _now,
   }: {
-    phase: number;
+    displayedPhase: number;
     isError: boolean;
     queue: ReturnType<typeof useStoryQueue>;
     now: number;
   }): DockState {
     if (isError) return "final";
-    if (phase === 1) {
+    if (displayedPhase === 1) {
       const arrivedCount = decoratedNodes.length;
       const total = layout.length || 0;
       if (total > 0 && arrivedCount >= total) return "ready";
       return "streaming";
     }
-    if (phase === 2) {
+    if (displayedPhase === 2) {
       if (planArrivedAt === null) return "streaming";
       const lastRevealAt = planArrivedAt + 600 + (outline.length - 1) * 700;
       return _now >= lastRevealAt ? "ready" : "revealing";
     }
-    if (phase === 3) return queue.dockState;
-    if (phase === 4) {
+    if (displayedPhase === 3) return queue.dockState;
+    if (displayedPhase === 4) {
       if (simStreamPhase === "complete" && finalProgress >= 1) return "final";
       return "streaming";
     }
@@ -900,11 +900,11 @@ export function ScreenProcessing({
       onContinue();
       return;
     }
-    if (phase === 1 || phase === 2) {
-      setUserUnlockedPhase(phase);
+    if (displayedPhase === 1 || displayedPhase === 2) {
+      setUserUnlockedPhase(displayedPhase);
       return;
     }
-    if (phase === 3) {
+    if (displayedPhase === 3) {
       if (queue.drained && (simStreamPhase === "complete" || simStreamPhase === "finalizing")) {
         onContinue();
         return;
@@ -1204,7 +1204,7 @@ export function ScreenProcessing({
             </div>
           )}
 
-          {!isError && phase === 1 && (
+          {!isError && displayedPhase === 1 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 14, overflow: "hidden" }}>
               {decoratedNodes.map((n, i) => (
                 <div
@@ -1252,7 +1252,7 @@ export function ScreenProcessing({
             </div>
           )}
 
-          {!isError && phase === 2 && (
+          {!isError && displayedPhase === 2 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 12, overflow: "hidden" }}>
               <div
                 className="serif"
@@ -1293,13 +1293,13 @@ export function ScreenProcessing({
             </div>
           )}
 
-          {!isError && phase === 3 && (
+          {!isError && displayedPhase === 3 && (
             <div style={{ display: "flex", flexDirection: "column", minHeight: 0, flex: 1 }}>
               <StoryScroll visible={queue.visible} now={now} />
             </div>
           )}
 
-          {!isError && phase === 4 && (
+          {!isError && displayedPhase === 4 && (
             <div
               style={{
                 display: "flex",
@@ -1349,7 +1349,7 @@ export function ScreenProcessing({
           )}
 
           <AdvanceDock
-            state={dockStateForScreen({ phase, isError, queue, now })}
+            state={dockStateForScreen({ displayedPhase, isError, queue, now })}
             now={now}
             onAdvance={handleAdvance}
           />
