@@ -21,7 +21,7 @@ export function ScreenLanding({ onContinue, onJumpTo, setSelfieUploaded, setSelf
   return (
     <div style={{ height: "100%", position: "relative", overflow: "hidden" }}>
       <div className="mark-anchor">
-        <Mark />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       <CornerLabel pos="tr">v 0.3 · simulation build</CornerLabel>
 
@@ -214,7 +214,7 @@ function autoSizeTextarea(el: HTMLTextAreaElement | null) {
   el.style.height = `${el.scrollHeight}px`;
 }
 
-export function ScreenIntake({ onContinue, profile, setProfile, pushVoiceSample }: ScreenProps) {
+export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVoiceSample }: ScreenProps) {
   const [step, setStep] = useState(0);
   const cur = INTAKE_FIELDS[step];
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -299,7 +299,7 @@ export function ScreenIntake({ onContinue, profile, setProfile, pushVoiceSample 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div className="mark-anchor">
-        <Mark />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       <CornerLabel pos="tr">
         intake · {String(step + 1).padStart(2, "0")} /{" "}
@@ -446,6 +446,7 @@ const PHASE_LABELS: Record<SimStreamPhase, string> = {
 
 export function ScreenProcessing({
   onContinue,
+  onJumpTo,
   profile,
   simStreamPhase,
   agentCount,
@@ -562,7 +563,7 @@ export function ScreenProcessing({
       }}
     >
       <div className="mark-anchor">
-        <Mark />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       <CornerLabel pos="tr">
         simulating · {simStreamPhase === "complete" ? "ready" : "do not refresh"}
@@ -786,7 +787,7 @@ export function ScreenProcessing({
 
 type RevealPhase = 0 | 1 | 2 | 3;
 
-export function ScreenReveal({ onContinue, profile, simulation }: ScreenProps) {
+export function ScreenReveal({ onContinue, onJumpTo, profile, simulation }: ScreenProps) {
   const [phase, setPhase] = useState<RevealPhase>(0);
   const { voiceMode, clonedVoiceId } = useVoice();
   const voicePrimed = useVoicePrimed();
@@ -836,7 +837,7 @@ export function ScreenReveal({ onContinue, profile, simulation }: ScreenProps) {
           pointerEvents: phase >= 2 ? "auto" : "none",
         }}
       >
-        <Mark />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       <CornerLabel pos="tr">
         {profile.targetYear} · age {olderAge}

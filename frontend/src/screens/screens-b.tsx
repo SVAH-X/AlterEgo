@@ -28,7 +28,7 @@ interface ChatMessage {
   done: boolean;
 }
 
-export function ScreenChat({ onContinue, profile, simulation }: ScreenProps) {
+export function ScreenChat({ onContinue, onJumpTo, profile, simulation }: ScreenProps) {
   const olderAge =
     (Number(profile.age) || 32) +
     ((Number(profile.targetYear) - Number(profile.presentYear)) || 20);
@@ -137,7 +137,7 @@ export function ScreenChat({ onContinue, profile, simulation }: ScreenProps) {
       }}
     >
       <div className="mark-anchor">
-        <Mark />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       <CornerLabel pos="tr">interview · {profile.targetYear || 2046}</CornerLabel>
 
@@ -344,6 +344,7 @@ function Message({ m }: { m: ChatMessage }) {
 
 export function ScreenTimeline({
   onContinue,
+  onJumpTo,
   profile,
   simulation,
   setSimulation,
@@ -560,7 +561,7 @@ export function ScreenTimeline({
       }}
     >
       <div className="mark-anchor">
-        <Mark />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       <CornerLabel pos="tr">
         {rewriting
@@ -1191,7 +1192,7 @@ function GeneratingCard({
   );
 }
 
-export function ScreenEnd({ onRestart, profile, simulation }: ScreenProps) {
+export function ScreenEnd({ onRestart, onJumpTo, profile, simulation }: ScreenProps) {
   const baseAge = profile.age || 32;
   const startYear = profile.presentYear || 2026;
   const endYear = profile.targetYear || 2046;
@@ -1232,7 +1233,7 @@ export function ScreenEnd({ onRestart, profile, simulation }: ScreenProps) {
       }}
     >
       <div className="mark-anchor">
-        <Mark />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       <CornerLabel pos="tr">end · {endYear}</CornerLabel>
 
