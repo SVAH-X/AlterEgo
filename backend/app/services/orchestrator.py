@@ -110,6 +110,7 @@ async def stream_simulation(
                 hero_portraits = [hero]
         sim = SimulationData(
             profile=profile,
+            agents=agents,
             agedPortraits=hero_portraits,
             checkpointsHigh=completed,
             futureSelfOpening=final_payload["futureSelfOpening"],
