@@ -1,5 +1,6 @@
 from app.models.chat import ChatMessage, ChatRequest, ChatResponse
 from app.models.checkpoint import Checkpoint, Tone
+from app.models.clinical import ClinicalRiskFactor, ClinicalSummary, HealthState
 from app.models.portrait import AgedPortrait, Trajectory
 from app.models.profile import Profile
 from app.models.simulation import SimulationData
@@ -10,6 +11,9 @@ __all__ = [
     "ChatRequest",
     "ChatResponse",
     "Checkpoint",
+    "ClinicalRiskFactor",
+    "ClinicalSummary",
+    "HealthState",
     "Profile",
     "SimulationData",
     "Tone",
