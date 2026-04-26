@@ -85,64 +85,6 @@ export const AE_DATA: SimulationData = {
     },
   ],
 
-  checkpointsLow: [
-    {
-      year: 2028,
-      age: 34,
-      title: "The promotion you turned down",
-      event: "Senior VP role offered. You ask for a week. Then say no.",
-      did: "Took the principal individual contributor track instead. Half the politics.",
-      consequence: "Your manager is annoyed for a quarter, then forgets.",
-      tone: "neutral",
-    },
-    {
-      year: 2030,
-      age: 36,
-      title: "The side project you finally finished",
-      event: "Two years of Saturday mornings on a small brand studio with a friend from school.",
-      did: "Launched it without quitting. Three clients in the first month.",
-      consequence: "It pays for itself by year-end. You start dreaming about it on weekdays.",
-      tone: "good",
-    },
-    {
-      year: 2033,
-      age: 39,
-      title: "The leap, taken on purpose",
-      event: "Studio revenue crosses your salary. Six months of runway saved.",
-      did: "Resigned in person. Cried in the car. Drove to the studio.",
-      consequence: "First year is hard. Second year is yours.",
-      tone: "good",
-    },
-    {
-      year: 2037,
-      age: 43,
-      title: "Your father's last summer",
-      event: "Diagnosis in May. Eight weeks at the lake house through August.",
-      did: "Closed the studio for the season. Took your laptop and didn't open it.",
-      consequence:
-        "You will remember the boat, the smell of the porch, the way he laughed at your impressions. You will not remember what you missed at work.",
-      tone: "good",
-    },
-    {
-      year: 2041,
-      age: 47,
-      title: "The work that became known for being yours",
-      event: "A campaign for a museum gets written about in a way that names you.",
-      did: "Hired a third designer. Kept the studio at six people on purpose.",
-      consequence: "You stop apologizing for the size of what you built.",
-      tone: "good",
-    },
-    {
-      year: 2046,
-      age: 52,
-      title: "Where the simulation ends",
-      event: "A studio with your name on the door. Tired in a way that feels earned.",
-      did: "Built the thing. Lost some years. Kept the ones that mattered.",
-      consequence: "The fear did not come true. Something else did.",
-      tone: "good",
-    },
-  ],
-
   futureSelfOpening:
     "It's me. I know that's strange. I'm older than you remember being. I want to tell you that you're going to be fine — that's the thing people say — but I think you'd rather I told you what's actually here.",
 
