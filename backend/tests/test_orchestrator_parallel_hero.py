@@ -36,7 +36,6 @@ def _original_sim() -> SimulationData:
             Checkpoint(year=2028, age=34, title="t", event="e", did="d",
                        consequence="c", tone="neutral"),
         ],
-        checkpointsLow=[],
         futureSelfOpening="hi",
         futureSelfReplies={"q": "a"},
     )
@@ -75,14 +74,9 @@ async def test_hero_runs_concurrent_with_finalize(monkeypatch) -> None:
         return [Checkpoint(year=2040, age=46, title="t", event="e", did="d",
                            consequence="c", tone="neutral") for _ in batch]
 
-    async def fake_alternate(profile, checkpoints, router):
-        return [Checkpoint(year=2040, age=46, title="alt", event="e", did="d",
-                           consequence="c", tone="neutral")]
-
     monkeypatch.setattr(orch, "_plan_branched_outline", fake_plan)
     monkeypatch.setattr(orch, "_detail_batch", fake_detail)
     monkeypatch.setattr(orch, "_finalize", slow_finalize)
-    monkeypatch.setattr(orch, "_alternate", fake_alternate)
 
     # We need a real selfie blob so the hero path fires. The actual gemini
     # api key gate also matters — patch settings to enable the path.

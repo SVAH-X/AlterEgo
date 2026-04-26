@@ -36,7 +36,6 @@ def _original_sim(agents: list[AgentSpec]) -> SimulationData:
         agents=agents,
         agedPortraits=[],
         checkpointsHigh=_kept_cps(),
-        checkpointsLow=[],
         futureSelfOpening="hi",
         futureSelfReplies={"q": "a"},
     )
@@ -66,14 +65,9 @@ def patched_pipeline(monkeypatch):
             },
         }
 
-    async def fake_alternate(profile, checkpoints, router):
-        return [Checkpoint(year=2038, age=44, title="alt", event="e",
-                           did="d", consequence="c", tone="neutral")]
-
     monkeypatch.setattr(orch, "_plan_branched_outline", fake_plan)
     monkeypatch.setattr(orch, "_detail_batch", fake_detail)
     monkeypatch.setattr(orch, "_finalize", fake_finalize)
-    monkeypatch.setattr(orch, "_alternate", fake_alternate)
     return orch
 
 

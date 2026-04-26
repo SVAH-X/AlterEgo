@@ -50,15 +50,10 @@ async def test_stream_simulation_persists_agents_on_complete(monkeypatch) -> Non
             },
         }
 
-    async def fake_alternate(profile, checkpoints, router):
-        return [Checkpoint(year=2028, age=34, title="t", event="e",
-                           did="d", consequence="c", tone="neutral")]
-
     monkeypatch.setattr(orch, "_count_agents", fake_count)
     monkeypatch.setattr(orch, "_plan_outline", fake_plan)
     monkeypatch.setattr(orch, "_detail_batch", fake_detail)
     monkeypatch.setattr(orch, "_finalize", fake_finalize)
-    monkeypatch.setattr(orch, "_alternate", fake_alternate)
     # No selfie so the hero portrait path is skipped.
 
     events = []

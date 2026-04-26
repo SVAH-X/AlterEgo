@@ -1,6 +1,6 @@
 """After this change, the branched fan-out should NOT re-emit pre-intervention
 portraits — the frontend retains them locally. The fan-out still emits the
-post-intervention high portraits (regenerated) and all low portraits."""
+post-intervention high portraits (regenerated)."""
 
 from unittest.mock import AsyncMock, patch
 
@@ -50,7 +50,7 @@ async def test_branched_fanout_does_not_re_emit_preserved_high() -> None:
         events = []
         async for ev in _fan_out_portraits_branched(
             profile=profile, selfie_bytes=b"x", selfie_mime="image/jpeg",
-            high=_cps(), low=_cps(), ages=ages,
+            high=_cps(), ages=ages,
             intervention=intervention,
             original_portraits=original_high,
         ):
