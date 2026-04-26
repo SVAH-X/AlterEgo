@@ -228,8 +228,7 @@ async def stream_branched_simulation(
 
     Events from BEFORE intervention.year are preserved verbatim from
     `original_simulation.checkpointsHigh`. Only the post-intervention years
-    are re-planned and re-detailed. Finalize + alternate use the full
-    combined trajectory.
+    are re-planned and re-detailed. Finalize uses the full combined trajectory.
     """
     settings = get_settings()
     if not settings.anthropic_api_key:
