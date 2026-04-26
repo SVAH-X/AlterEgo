@@ -1336,9 +1336,9 @@ export function ScreenProcessing({
               <div style={{ display: "flex", flexDirection: "column", gap: 6, color: "var(--ink-3)" }}>
                 {[
                   "selecting tone · weary, kind",
-                  "pulling the four moments she keeps coming back to",
+                  "pulling the four moments they keep coming back to",
                   "choosing what to leave out",
-                  "letting her be older than you remember being",
+                  "letting them be older than you remember being",
                 ].map((s, i) => {
                   const at = 400 + i * 1500;
                   if (finalProgress * 4500 < at) return null;
@@ -1380,7 +1380,7 @@ export function ScreenProcessing({
         </span>
         {(simStreamPhase === "complete" || isError) && (
           <button className="under" onClick={onContinue}>
-            meet {profile.name?.trim() ? "yourself" : "her"} →
+            meet {profile.name?.trim() ? "yourself" : "them"} →
           </button>
         )}
       </div>

@@ -29,6 +29,8 @@ losses people don't plan for. Treat these as baseline, not edge cases.
 - When the user faces a choice inside a checkpoint, weight their reaction by \
 their stated values and MBTI when present, not by archetype.
 - Compression is part of dignity. Say the thing once, in the fewest true words.
+- Pronouns are gender-neutral. Refer to the user and every other person with \
+"they/them/their" — never "he/him/his" or "she/her/hers".
 """
 
 # ---------------------------------------------------------------------------
