@@ -382,6 +382,16 @@ export function ScreenHealth({ onContinue, onJumpTo, profile, setProfile }: Scre
   const set = (key: HealthFieldKey, value: string | null) => {
     setProfile({ ...profile, [key]: value });
   };
+  const { voiceMode } = useVoice();
+  const voicePrimed = useVoicePrimed();
+  const tts = useTTSPlayer();
+  useEffect(() => {
+    if (voiceMode && voicePrimed) {
+      tts.play("A few quick health questions. Tap your answers.");
+    }
+    return () => tts.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
