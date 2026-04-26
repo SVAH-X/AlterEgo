@@ -41,7 +41,7 @@ def test_values_block_renders_chosen_sides() -> None:
     # Loose contract: must mention each chosen side word and frame as "X over Y".
     assert "liked" in out.lower() and "respected" in out.lower()
     assert "over" in out.lower()
-    assert "smaller life done well" in out.lower() or "smaller_well" in out.lower()
+    assert "smaller life done well" in out.lower()
 
 
 def test_values_block_partial_input_renders_only_present() -> None:

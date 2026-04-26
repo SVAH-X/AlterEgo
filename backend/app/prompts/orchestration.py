@@ -12,7 +12,7 @@ from typing import Optional
 
 from app.models.checkpoint import Checkpoint
 from app.models.orchestration import AgentSpec, OutlineEvent
-from app.models.profile import Profile
+from app.models.profile import Profile, VALID_VALUES_DYADS
 from app.services.state_model import DRIFT_RULES_BLOCK
 
 # ---------------------------------------------------------------------------
@@ -578,31 +578,22 @@ Now write the alternate trajectory at ~45 hrs/wk. Output the JSON array only."""
 # Personality prompt blocks (MBTI + values). Empty string when absent so they
 # inline-append safely into existing prompt skeletons.
 
-# Pretty labels for each dyad side, used to render the values block in
-# natural language. Keys must match VALID_VALUES_DYADS in models/profile.py.
-_DYAD_LABELS: dict[str, dict[str, str]] = {
-    "respected_liked": {"respected": "respected", "liked": "liked"},
-    "certainty_possibility": {"certainty": "certainty", "possibility": "possibility"},
-    "honest_kind": {"honest": "honest", "kind": "kind"},
-    "movement_roots": {"movement": "movement", "roots": "roots"},
-    "life_scope": {
-        "smaller_well": "a smaller life done well",
-        "bigger_okay": "a bigger life done okay",
-    },
+# Each dyad maps to its two sides as ((left_slug, left_label), (right_slug, right_label)).
+# Keys must mirror VALID_VALUES_DYADS in models/profile.py (asserted below).
+_DYAD_SIDES: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {
+    "respected_liked":        (("respected", "respected"), ("liked", "liked")),
+    "certainty_possibility":  (("certainty", "certainty"), ("possibility", "possibility")),
+    "honest_kind":            (("honest", "honest"), ("kind", "kind")),
+    "movement_roots":         (("movement", "movement"), ("roots", "roots")),
+    "life_scope":             (
+        ("smaller_well", "a smaller life done well"),
+        ("bigger_okay", "a bigger life done okay"),
+    ),
 }
 
-# The "other side" of a dyad — used for "X over Y" rendering.
-_DYAD_OTHER: dict[str, dict[str, str]] = {
-    "respected_liked": {"respected": "liked", "liked": "respected"},
-    "certainty_possibility": {
-        "certainty": "possibility", "possibility": "certainty"
-    },
-    "honest_kind": {"honest": "kind", "kind": "honest"},
-    "movement_roots": {"movement": "roots", "roots": "movement"},
-    "life_scope": {
-        "smaller_well": "bigger_okay", "bigger_okay": "smaller_well"
-    },
-}
+assert set(_DYAD_SIDES) == set(VALID_VALUES_DYADS), (
+    "values dyad tables out of sync between models/profile.py and prompts/orchestration.py"
+)
 
 
 def _mbti_block(profile: Profile) -> str:
@@ -617,19 +608,23 @@ def _values_block(profile: Profile) -> str:
 
     Format: '\n- values (forced-choice): leans LIKED over respected, ...'
     Only renders dyads whose chosen side is recognized; silently drops the rest.
+    Relies on Profile._normalize_values to drop invalid input upstream.
     """
     if not profile.values:
         return ""
     parts: list[str] = []
     for slug, side in profile.values.items():
-        labels = _DYAD_LABELS.get(slug)
-        others = _DYAD_OTHER.get(slug)
-        if not labels or not others or side not in labels:
+        sides = _DYAD_SIDES.get(slug)
+        if not sides:
             continue
-        chosen = labels[side]
-        loser_slug = others[side]
-        loser = labels[loser_slug]
-        parts.append(f"{chosen.upper()} over {loser}")
+        (a_slug, a_label), (b_slug, b_label) = sides
+        if side == a_slug:
+            chosen, other = a_label, b_label
+        elif side == b_slug:
+            chosen, other = b_label, a_label
+        else:
+            continue
+        parts.append(f"{chosen.upper()} over {other}")
     if not parts:
         return ""
     return "\n- values (forced-choice): leans " + ", ".join(parts)
