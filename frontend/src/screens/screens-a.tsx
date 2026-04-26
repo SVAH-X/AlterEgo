@@ -481,6 +481,69 @@ export function ScreenHealth({ onContinue, onJumpTo, profile, setProfile }: Scre
   );
 }
 
+function ClinicalCard({
+  summary,
+  visible,
+}: {
+  summary: NonNullable<import("../types").SimulationData["clinicalSummary"]>;
+  visible: boolean;
+}) {
+  const stateColor: Record<string, string> = {
+    stable: "var(--good, var(--accent))",
+    strained: "var(--accent)",
+    critical: "var(--warn, var(--accent))",
+  };
+  return (
+    <div
+      style={{
+        opacity: visible ? 1 : 0,
+        transition: "opacity 1600ms var(--ease)",
+        maxWidth: 360,
+        width: "100%",
+        boxSizing: "border-box",
+        padding: "24px 26px",
+        borderTop: `1px solid ${stateColor[summary.finalHealthState]}`,
+        borderBottom: `1px solid var(--line-soft)`,
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        background: "rgba(255,255,255,0.015)",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <Meta style={{ color: "var(--accent)" }}>clinical read</Meta>
+        <Meta style={{ color: stateColor[summary.finalHealthState] }}>
+          {summary.finalHealthState}
+        </Meta>
+      </div>
+      <ul
+        style={{
+          listStyle: "none",
+          padding: 0,
+          margin: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+        }}
+      >
+        {summary.riskFactors.map((rf, i) => (
+          <li key={i} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span
+              className="serif"
+              style={{ fontSize: 17, lineHeight: 1.3, fontStyle: "italic" }}
+            >
+              {rf.label}
+            </span>
+            <span style={{ fontSize: 13, lineHeight: 1.5, color: "var(--ink-1)" }}>
+              {rf.consequence}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVoiceSample }: ScreenProps) {
   const [step, setStep] = useState(0);
   const cur = INTAKE_FIELDS[step];
@@ -1883,84 +1946,111 @@ export function ScreenReveal({ onContinue, onJumpTo, profile, simulation }: Scre
           style={{
             minHeight: "100%",
             display: "flex",
-            flexDirection: "column",
+            flexDirection: "row",
+            flexWrap: "wrap",
             alignItems: "center",
             justifyContent: "center",
+            gap: "clamp(24px, 4vw, 64px)",
             padding: "80px 40px 140px",
             boxSizing: "border-box",
           }}
         >
           <div
             style={{
-              width: "min(420px, 32vw)",
-              height: "min(56vh, 560px)",
-              flexShrink: 0,
-              opacity: phase >= 1 ? 1 : 0,
-              transition: "opacity 2200ms var(--ease)",
-            }}
-          >
-            {(() => {
-              const p = nearestPortrait(simulation?.agedPortraits, "high", profile.targetYear);
-              return <PortraitImage src={p?.imageUrl} alt={p ? `you at ${p.age}` : "you"} />;
-            })()}
-          </div>
-
-          <div
-            style={{
-              marginTop: 36,
-              textAlign: "center",
-              opacity: phase >= 2 ? 1 : 0,
-              transition: "opacity 1600ms var(--ease)",
-            }}
-          >
-            <Meta style={{ marginBottom: 14 }}>
-              {profile.name || "Sarah"} · {profile.targetYear || 2046}
-            </Meta>
-          </div>
-
-          <div
-            style={{
+              flex: "1 1 520px",
               maxWidth: 720,
-              margin: "28px auto 0",
-              textAlign: "center",
-              minHeight: 130,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
             }}
           >
-            {phase >= 3 && (
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 14,
-                  marginBottom: 22,
-                  animation: "fade-in 700ms var(--ease) both",
-                }}
-              >
-                <Wave />
-                <span className="meta" style={{ color: "var(--accent)" }}>
-                  future self speaking
-                </span>
-              </div>
-            )}
-            <p
-              className="serif"
+            <div
               style={{
-                fontSize: "clamp(20px, 2.2vw, 26px)",
-                lineHeight: 1.55,
-                fontStyle: "italic",
-                color: "var(--ink)",
-                margin: 0,
-                letterSpacing: "0.003em",
+                width: "min(420px, 32vw)",
+                height: "min(56vh, 560px)",
+                flexShrink: 0,
+                opacity: phase >= 1 ? 1 : 0,
+                transition: "opacity 2200ms var(--ease)",
               }}
             >
-              {streamed}
-              {phase >= 3 && streamed.length < opening.length && (
-                <span className="caret" style={{ height: 22 }}>
-                  &nbsp;
-                </span>
+              {(() => {
+                const p = nearestPortrait(simulation?.agedPortraits, "high", profile.targetYear);
+                return <PortraitImage src={p?.imageUrl} alt={p ? `you at ${p.age}` : "you"} />;
+              })()}
+            </div>
+
+            <div
+              style={{
+                marginTop: 36,
+                textAlign: "center",
+                opacity: phase >= 2 ? 1 : 0,
+                transition: "opacity 1600ms var(--ease)",
+              }}
+            >
+              <Meta style={{ marginBottom: 14 }}>
+                {profile.name || "Sarah"} · {profile.targetYear || 2046}
+              </Meta>
+            </div>
+
+            <div
+              style={{
+                maxWidth: 720,
+                margin: "28px auto 0",
+                textAlign: "center",
+                minHeight: 130,
+              }}
+            >
+              {phase >= 3 && (
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 14,
+                    marginBottom: 22,
+                    animation: "fade-in 700ms var(--ease) both",
+                  }}
+                >
+                  <Wave />
+                  <span className="meta" style={{ color: "var(--accent)" }}>
+                    future self speaking
+                  </span>
+                </div>
               )}
-            </p>
+              <p
+                className="serif"
+                style={{
+                  fontSize: "clamp(20px, 2.2vw, 26px)",
+                  lineHeight: 1.55,
+                  fontStyle: "italic",
+                  color: "var(--ink)",
+                  margin: 0,
+                  letterSpacing: "0.003em",
+                }}
+              >
+                {streamed}
+                {phase >= 3 && streamed.length < opening.length && (
+                  <span className="caret" style={{ height: 22 }}>
+                    &nbsp;
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
+
+          {simulation?.clinicalSummary ? (
+            <div
+              style={{
+                flex: "0 1 360px",
+                display: "flex",
+                justifyContent: "center",
+              }}
+            >
+              <ClinicalCard
+                summary={simulation.clinicalSummary}
+                visible={phase >= 3}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 
