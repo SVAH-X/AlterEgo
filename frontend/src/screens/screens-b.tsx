@@ -1,13 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ScreenProps } from "../App";
-import {
-  CornerLabel,
-  Mark,
-  Meta,
-  PortraitImage,
-  Wave,
-  useStreamedText,
-} from "../atoms";
+import { Mark, Meta, PortraitImage, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
 import { chat, simulateBranchStream } from "../lib/api";
 import { nearestPortrait } from "../lib/portraits";
@@ -28,7 +21,7 @@ interface ChatMessage {
   done: boolean;
 }
 
-export function ScreenChat({ onContinue, profile, simulation }: ScreenProps) {
+export function ScreenChat({ onContinue, onRestart, profile, simulation }: ScreenProps) {
   const olderAge =
     (Number(profile.age) || 32) +
     ((Number(profile.targetYear) - Number(profile.presentYear)) || 20);
@@ -137,10 +130,8 @@ export function ScreenChat({ onContinue, profile, simulation }: ScreenProps) {
       }}
     >
       <div className="mark-anchor">
-        <Mark />
+        <Mark onClick={onRestart} />
       </div>
-      <CornerLabel pos="tr">interview · {profile.targetYear || 2046}</CornerLabel>
-
       <div
         style={{
           borderRight: "1px solid var(--line-soft)",
@@ -344,6 +335,7 @@ function Message({ m }: { m: ChatMessage }) {
 
 export function ScreenTimeline({
   onContinue,
+  onRestart,
   profile,
   simulation,
   setSimulation,
@@ -560,16 +552,8 @@ export function ScreenTimeline({
       }}
     >
       <div className="mark-anchor">
-        <Mark />
+        <Mark onClick={onRestart} />
       </div>
-      <CornerLabel pos="tr">
-        {rewriting
-          ? `rewriting · from ${rewriting.year}`
-          : autoplay
-          ? "timeline · auto-play"
-          : "timeline · scrubbing"}
-      </CornerLabel>
-
       {rewriting && (
         <div
           style={{
@@ -1232,10 +1216,8 @@ export function ScreenEnd({ onRestart, profile, simulation }: ScreenProps) {
       }}
     >
       <div className="mark-anchor">
-        <Mark />
+        <Mark onClick={onRestart} />
       </div>
-      <CornerLabel pos="tr">end · {endYear}</CornerLabel>
-
       <div
         style={{
           display: "flex",

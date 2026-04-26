@@ -115,7 +115,14 @@ export function CornerLabel({ pos, children }: { pos: CornerPos; children: React
   );
 }
 
-export function Mark() {
+export function Mark({ onClick }: { onClick?: () => void } = {}) {
+  if (onClick) {
+    return (
+      <button type="button" className="mark mark-button" onClick={onClick} aria-label="Return to home">
+        AlterEgo
+      </button>
+    );
+  }
   return <span className="mark">AlterEgo</span>;
 }
 

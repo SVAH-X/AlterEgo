@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ScreenProps, SimStreamPhase } from "../App";
-import { CornerLabel, Mark, Meta, PortraitImage, Wave, useStreamedText } from "../atoms";
+import { Mark, Meta, PortraitImage, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
 import { nearestPortrait } from "../lib/portraits";
 import type { Profile } from "../types";
@@ -11,7 +11,13 @@ import { useTTSPlayer } from "../voice/useTTSPlayer";
 import { MicButton } from "../voice/MicButton";
 import { cloneVoice } from "../lib/voice";
 
-export function ScreenLanding({ onContinue, onJumpTo, setSelfieUploaded, setSelfie }: ScreenProps) {
+export function ScreenLanding({
+  onContinue,
+  onJumpTo,
+  onRestart,
+  setSelfieUploaded,
+  setSelfie,
+}: ScreenProps) {
   function skip() {
     setSelfieUploaded(false);
     setSelfie(null);
@@ -21,10 +27,8 @@ export function ScreenLanding({ onContinue, onJumpTo, setSelfieUploaded, setSelf
   return (
     <div style={{ height: "100%", position: "relative", overflow: "hidden" }}>
       <div className="mark-anchor">
-        <Mark />
+        <Mark onClick={onRestart} />
       </div>
-      <CornerLabel pos="tr">v 0.3 · simulation build</CornerLabel>
-
       {/* Whole hero advances to the selfie choice screen. */}
       <button
         type="button"
@@ -214,7 +218,13 @@ function autoSizeTextarea(el: HTMLTextAreaElement | null) {
   el.style.height = `${el.scrollHeight}px`;
 }
 
-export function ScreenIntake({ onContinue, profile, setProfile, pushVoiceSample }: ScreenProps) {
+export function ScreenIntake({
+  onContinue,
+  onRestart,
+  profile,
+  setProfile,
+  pushVoiceSample,
+}: ScreenProps) {
   const [step, setStep] = useState(0);
   const cur = INTAKE_FIELDS[step];
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -299,13 +309,8 @@ export function ScreenIntake({ onContinue, profile, setProfile, pushVoiceSample 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div className="mark-anchor">
-        <Mark />
+        <Mark onClick={onRestart} />
       </div>
-      <CornerLabel pos="tr">
-        intake · {String(step + 1).padStart(2, "0")} /{" "}
-        {String(INTAKE_FIELDS.length).padStart(2, "0")}
-      </CornerLabel>
-
       <div
         style={{
           flex: 1,
@@ -446,6 +451,7 @@ const PHASE_LABELS: Record<SimStreamPhase, string> = {
 
 export function ScreenProcessing({
   onContinue,
+  onRestart,
   profile,
   simStreamPhase,
   agentCount,
@@ -562,12 +568,8 @@ export function ScreenProcessing({
       }}
     >
       <div className="mark-anchor">
-        <Mark />
+        <Mark onClick={onRestart} />
       </div>
-      <CornerLabel pos="tr">
-        simulating · {simStreamPhase === "complete" ? "ready" : "do not refresh"}
-      </CornerLabel>
-
       <svg
         width="640"
         height="640"
@@ -786,7 +788,7 @@ export function ScreenProcessing({
 
 type RevealPhase = 0 | 1 | 2 | 3;
 
-export function ScreenReveal({ onContinue, profile, simulation }: ScreenProps) {
+export function ScreenReveal({ onContinue, onRestart, profile, simulation }: ScreenProps) {
   const [phase, setPhase] = useState<RevealPhase>(0);
   const { voiceMode, clonedVoiceId } = useVoice();
   const voicePrimed = useVoicePrimed();
@@ -812,10 +814,6 @@ export function ScreenReveal({ onContinue, profile, simulation }: ScreenProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, voiceMode, voicePrimed, opening, clonedVoiceId]);
 
-  const olderAge =
-    (Number(profile.age) || 32) +
-    ((Number(profile.targetYear) - Number(profile.presentYear)) || 20);
-
   return (
     <div
       style={{
@@ -836,12 +834,8 @@ export function ScreenReveal({ onContinue, profile, simulation }: ScreenProps) {
           pointerEvents: phase >= 2 ? "auto" : "none",
         }}
       >
-        <Mark />
+        <Mark onClick={onRestart} />
       </div>
-      <CornerLabel pos="tr">
-        {profile.targetYear} · age {olderAge}
-      </CornerLabel>
-
       {/* Scroll container — content centers when it fits, scrolls when it doesn't */}
       <div
         style={{
