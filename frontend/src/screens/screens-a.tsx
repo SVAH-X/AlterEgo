@@ -178,9 +178,49 @@ export function ScreenLanding({ onContinue, onJumpTo, setSelfieUploaded, setSelf
   );
 }
 
+type DyadSide = { slug: string; label: string };
+type DyadSpec = { slug: string; left: DyadSide; right: DyadSide };
+
+const VALUES_DYADS: DyadSpec[] = [
+  {
+    slug: "respected_liked",
+    left: { slug: "respected", label: "Respected" },
+    right: { slug: "liked", label: "Liked" },
+  },
+  {
+    slug: "certainty_possibility",
+    left: { slug: "certainty", label: "Certainty" },
+    right: { slug: "possibility", label: "Possibility" },
+  },
+  {
+    slug: "honest_kind",
+    left: { slug: "honest", label: "Honest" },
+    right: { slug: "kind", label: "Kind" },
+  },
+  {
+    slug: "movement_roots",
+    left: { slug: "movement", label: "Movement" },
+    right: { slug: "roots", label: "Roots" },
+  },
+  {
+    slug: "life_scope",
+    left: { slug: "smaller_well", label: "A smaller life done well" },
+    right: { slug: "bigger_okay", label: "A bigger life done okay" },
+  },
+];
+
+const MBTI_TYPES: string[] = [
+  "INTJ", "INTP", "ENTJ", "ENTP",
+  "INFJ", "INFP", "ENFJ", "ENFP",
+  "ISTJ", "ISFJ", "ESTJ", "ESFJ",
+  "ISTP", "ISFP", "ESTP", "ESFP",
+];
+
 type IntakeField =
   | { key: keyof Profile; label: string; placeholder: string; type: "text" | "textarea"; suffix?: string }
-  | { key: keyof Profile; label: string; placeholder: string; type: "number"; suffix?: string };
+  | { key: keyof Profile; label: string; placeholder: string; type: "number"; suffix?: string }
+  | { key: "mbti"; label: string; type: "mbti"; suffix?: string }
+  | { key: "values"; label: string; type: "dyads"; dyads: DyadSpec[]; suffix?: string };
 
 const INTAKE_FIELDS: IntakeField[] = [
   { key: "name", label: "What should I call you?", placeholder: "Your name", type: "text" },
@@ -198,6 +238,18 @@ const INTAKE_FIELDS: IntakeField[] = [
     label: "What are you afraid of?",
     placeholder: "Looking up at fifty and realizing I optimized for the wrong thing",
     type: "textarea",
+  },
+  {
+    key: "mbti",
+    label: "Your MBTI, if you know it.",
+    type: "mbti",
+    suffix: "Skip if you don't. It's optional — a hint, not a label.",
+  },
+  {
+    key: "values",
+    label: "Pick one in each pair. There's no right answer — just yours.",
+    type: "dyads",
+    dyads: VALUES_DYADS,
   },
   {
     key: "targetYear",
