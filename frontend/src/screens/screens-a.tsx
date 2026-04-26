@@ -588,12 +588,12 @@ function DyadsPicker({
 
 const PHASE_LABELS: Record<SimStreamPhase, string> = {
   idle: "waiting to begin",
-  counting: "drafting the people in your life",
-  plan: "laying out the years",
-  events: "writing the moments",
-  finalizing: "stitching it together",
+  counting: "finding key people",
+  plan: "planning the timeline",
+  events: "generating events",
+  finalizing: "finalizing results",
   complete: "ready",
-  error: "the simulation failed",
+  error: "simulation failed",
 };
 
 export function ScreenProcessing({

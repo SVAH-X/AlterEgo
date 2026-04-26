@@ -500,10 +500,10 @@ export function ScreenTimeline({
       for await (const ev of simulateBranchStream(profile, cp.year, trimmed, originalSim, selfie)) {
         if (ev.phase === "counting") {
           setRewriting((r) =>
-            r ? { ...r, phase: "redrafting the people in your life" } : null,
+            r ? { ...r, phase: "finding key people" } : null,
           );
         } else if (ev.phase === "plan") {
-          setRewriting((r) => (r ? { ...r, phase: "laying out the new years" } : null));
+          setRewriting((r) => (r ? { ...r, phase: "planning the new timeline" } : null));
         } else if (ev.phase === "event") {
           // Backend re-emits the pre-intervention (kept) events with their
           // original indices, then streams the NEW events at indices
@@ -515,12 +515,12 @@ export function ScreenTimeline({
             if (evtIndex < r.fromIdx) return r; // kept event — already shown
             return {
               ...r,
-              phase: `writing ${newCp.year}`,
+              phase: `generating ${newCp.year}`,
               newCheckpoints: [...r.newCheckpoints, newCp],
             };
           });
         } else if (ev.phase === "finalizing") {
-          setRewriting((r) => (r ? { ...r, phase: "stitching it together" } : null));
+          setRewriting((r) => (r ? { ...r, phase: "finalizing results" } : null));
         } else if (ev.phase === "complete") {
           // The backend no longer re-emits pre-intervention high portraits to
           // save upload bytes — it strips them out. We retain the originals
