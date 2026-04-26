@@ -201,11 +201,6 @@ export default function App() {
   // continue arriving after the user advances past Processing.
   const runSimulate = () => {
     if (streamingRef.current) return; // guard against double-start
-    if (!selfie) {
-      setErrorMessage("Selfie required before simulate");
-      setSimStreamPhase("error");
-      return;
-    }
     streamingRef.current = true;
     // Token guards against a restart-mid-stream race: if the user hits
     // restart while events are in flight, restart() flips streamingRef to
@@ -259,7 +254,7 @@ export default function App() {
             setSimStreamPhase("events");
           } else if (ev.phase === "finalizing") {
             setSimStreamPhase("finalizing");
-            setLatestTitle("weaving the threads — the alternate path, the voice");
+            setLatestTitle("weaving the threads — the voice");
           } else if (ev.phase === "complete") {
             setSimulationState(ev.simulation);
             setTimelineViewed(false);

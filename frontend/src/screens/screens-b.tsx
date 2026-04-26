@@ -4,12 +4,10 @@ import {
   CornerLabel,
   Mark,
   Meta,
-  Portrait,
+  PortraitImage,
   Wave,
-  pickPortraitAge,
   useStreamedText,
 } from "../atoms";
-import type { PortraitMood } from "../atoms";
 import { AE_DATA } from "../data";
 import { chat, simulateBranchStream } from "../lib/api";
 import { nearestPortrait } from "../lib/portraits";
@@ -30,7 +28,7 @@ interface ChatMessage {
   done: boolean;
 }
 
-export function ScreenChat({ onContinue, profile, simulation, selfieUploaded }: ScreenProps) {
+export function ScreenChat({ onContinue, onJumpTo, profile, simulation }: ScreenProps) {
   const olderAge =
     (Number(profile.age) || 32) +
     ((Number(profile.targetYear) - Number(profile.presentYear)) || 20);
@@ -139,7 +137,7 @@ export function ScreenChat({ onContinue, profile, simulation, selfieUploaded }: 
       }}
     >
       <div className="mark-anchor">
-        <Mark />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       <CornerLabel pos="tr">interview · {profile.targetYear || 2046}</CornerLabel>
 
@@ -156,16 +154,7 @@ export function ScreenChat({ onContinue, profile, simulation, selfieUploaded }: 
         <div style={{ width: "100%", height: 420, flexShrink: 0, maxWidth: 320 }}>
           {(() => {
             const p = nearestPortrait(simulation?.agedPortraits, "high", profile.targetYear);
-            if (p?.imageUrl) {
-              return (
-                <img
-                  src={p.imageUrl}
-                  alt={`you at ${p.age}`}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
-                />
-              );
-            }
-            return <Portrait age={olderAge} mood="dim" blurred={!selfieUploaded} />;
+            return <PortraitImage src={p?.imageUrl} alt={p ? `you at ${p.age}` : "you"} />;
           })()}
         </div>
         <div style={{ textAlign: "center" }}>
@@ -286,7 +275,7 @@ export function ScreenChat({ onContinue, profile, simulation, selfieUploaded }: 
             <input
               className="field"
               style={{ borderBottom: "none", fontSize: 20, padding: "8px 0" }}
-              placeholder="Ask her something else…"
+              placeholder="Ask something else…"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
@@ -355,12 +344,12 @@ function Message({ m }: { m: ChatMessage }) {
 
 export function ScreenTimeline({
   onContinue,
+  onJumpTo,
   profile,
   simulation,
   setSimulation,
   timelineViewed,
   setTimelineViewed,
-  selfieUploaded,
   selfie,
   mergePortrait,
 }: ScreenProps) {
@@ -385,6 +374,10 @@ export function ScreenTimeline({
     phase: string;
     newCheckpoints: Checkpoint[];
   } | null>(null);
+  // Spans the full regeneration pipeline (from intervention submit through the
+  // last post-complete portrait event), so the portrait overlay stays up while
+  // new faces are still streaming in even after `rewriting` clears.
+  const [regenerating, setRegenerating] = useState(false);
   const currentYear = Math.round(startYear + t * span);
   const currentAge = baseAge + (currentYear - startYear);
 
@@ -494,9 +487,17 @@ export function ScreenTimeline({
     const originalSim = simulation ?? AE_DATA;
     setIntervening(null);
     setAutoplay(false);
+    setRegenerating(true);
     setRewriting({ year: cp.year, fromIdx: idx, phase: "preparing", newCheckpoints: [] });
+    // Drop the stale aged portraits immediately — we don't want the user
+    // staring at their old future face while the new path is being written.
+    // setSimulation resets timelineViewed; restore it on the same tick.
+    if (simulation) {
+      setSimulation({ ...simulation, agedPortraits: [] });
+      setTimelineViewed(true);
+    }
     try {
-      for await (const ev of simulateBranchStream(profile, cp.year, trimmed, originalSim, selfie!)) {
+      for await (const ev of simulateBranchStream(profile, cp.year, trimmed, originalSim, selfie)) {
         if (ev.phase === "counting") {
           setRewriting((r) =>
             r ? { ...r, phase: "redrafting the people in your life" } : null,
@@ -521,10 +522,17 @@ export function ScreenTimeline({
         } else if (ev.phase === "finalizing") {
           setRewriting((r) => (r ? { ...r, phase: "stitching it together" } : null));
         } else if (ev.phase === "complete") {
-          // Reset agedPortraits to [] in the freshly-completed simulation;
-          // post-complete portrait events below will fill them in via
-          // mergePortrait, mirroring the App-level runSimulate flow.
-          setSimulation({ ...ev.simulation, agedPortraits: [] });
+          // The backend no longer re-emits pre-intervention high portraits to
+          // save upload bytes — it strips them out. We retain the originals
+          // locally and re-merge them here so the slider/encore screens still
+          // have early-life faces.
+          const preservedHigh = (originalSim.agedPortraits ?? []).filter(
+            (p) => p.trajectory === "high" && p.year < cp.year,
+          );
+          setSimulation({
+            ...ev.simulation,
+            agedPortraits: [...preservedHigh, ...ev.simulation.agedPortraits],
+          });
           setRewriting(null);
           // Drop the user at the end of the new trajectory, no replay — they
           // just watched it materialize. They can scrub or intervene again.
@@ -545,10 +553,9 @@ export function ScreenTimeline({
       console.error("branch stream failed:", e);
     } finally {
       setRewriting((r) => (r ? null : r)); // clear if not already cleared
+      setRegenerating(false);
     }
   }
-
-  const mood: PortraitMood = currentYear < 2032 ? "neutral" : "dim";
 
   return (
     <div
@@ -561,7 +568,7 @@ export function ScreenTimeline({
       }}
     >
       <div className="mark-anchor">
-        <Mark />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       <CornerLabel pos="tr">
         {rewriting
@@ -620,33 +627,80 @@ export function ScreenTimeline({
             flexShrink: 0,
             maxWidth: 360,
             transition: "filter 600ms var(--ease)",
+            position: "relative",
           }}
         >
           {(() => {
             const p = nearestPortrait(simulation?.agedPortraits, "high", currentYear, Infinity);
-            if (p?.imageUrl) {
-              return (
-                <img
-                  src={p.imageUrl}
-                  alt={`you at ${p.age}`}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    borderRadius: 8,
-                  }}
-                />
-              );
-            }
-            return (
-              <Portrait
-                age={currentAge}
-                mood={mood}
-                fadeKey={pickPortraitAge(currentAge)}
-                blurred={!selfieUploaded}
-              />
-            );
+            return <PortraitImage src={p?.imageUrl} alt={p ? `you at ${p.age}` : "you"} />;
           })()}
+          {regenerating && (
+            <div
+              aria-live="polite"
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: 8,
+                overflow: "hidden",
+                pointerEvents: "none",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  height: 2,
+                  background:
+                    "linear-gradient(90deg, transparent, var(--accent, #d8b86a), transparent)",
+                  animation: "sweep 2.4s linear infinite",
+                }}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  left: 12,
+                  right: 12,
+                  bottom: 14,
+                  display: "flex",
+                  justifyContent: "center",
+                  animation: "fade-in 400ms var(--ease) both",
+                }}
+              >
+                <div
+                  style={{
+                    maxWidth: "100%",
+                    padding: "8px 12px",
+                    border: "1px solid var(--accent-line)",
+                    borderRadius: 4,
+                    background: "rgba(20, 16, 12, 0.85)",
+                    backdropFilter: "blur(6px)",
+                    color: "var(--ink)",
+                    fontFamily: "var(--mono)",
+                    fontSize: 10,
+                    letterSpacing: "0.16em",
+                    textTransform: "lowercase",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    minWidth: 0,
+                  }}
+                >
+                  <Wave />
+                  <span
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      minWidth: 0,
+                    }}
+                  >
+                    regenerating
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <div style={{ textAlign: "center" }}>
           <div
@@ -761,7 +815,8 @@ export function ScreenTimeline({
           bottom: 0,
           padding: "32px 60px 36px",
           borderTop: "1px solid var(--line-soft)",
-          background: "linear-gradient(180deg, transparent, rgba(0,0,0,0.4) 30%)",
+          background: "linear-gradient(180deg, rgba(10,9,8,0.85), var(--bg) 24px)",
+          backdropFilter: "blur(8px)",
         }}
       >
         <div
@@ -1144,7 +1199,7 @@ function GeneratingCard({
   );
 }
 
-export function ScreenEnd({ onRestart, profile, simulation, selfieUploaded }: ScreenProps) {
+export function ScreenEnd({ onRestart, onJumpTo, profile, simulation }: ScreenProps) {
   const baseAge = profile.age || 32;
   const startYear = profile.presentYear || 2026;
   const endYear = profile.targetYear || 2046;
@@ -1185,7 +1240,7 @@ export function ScreenEnd({ onRestart, profile, simulation, selfieUploaded }: Sc
       }}
     >
       <div className="mark-anchor">
-        <Mark />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       <CornerLabel pos="tr">end · {endYear}</CornerLabel>
 
@@ -1203,16 +1258,7 @@ export function ScreenEnd({ onRestart, profile, simulation, selfieUploaded }: Sc
         <div style={{ width: "min(360px, 32vw)", height: "min(50vh, 460px)" }}>
           {(() => {
             const p = nearestPortrait(simulation?.agedPortraits, "high", endYear);
-            if (p?.imageUrl) {
-              return (
-                <img
-                  src={p.imageUrl}
-                  alt={`you at ${p.age}`}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }}
-                />
-              );
-            }
-            return <Portrait age={finalAge} mood="dim" blurred={!selfieUploaded} />;
+            return <PortraitImage src={p?.imageUrl} alt={p ? `you at ${p.age}` : "you"} />;
           })()}
         </div>
 

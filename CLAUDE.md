@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AlterEgo is a personal future simulator built for LA Hacks 2026. Users fill out a short intake form and receive two precomputed 20-year life trajectories—a high-hours path and a low-hours alternate—delivered as streaming checkpoint cards, followed by a voiced conversation with their simulated future self.
+AlterEgo is a personal future simulator built for LA Hacks 2026. Users fill out a short intake form and receive a precomputed 20-year life trajectory delivered as streaming checkpoint cards, followed by a voiced conversation with their simulated future self.
 
 ## Commands
 
@@ -41,8 +41,8 @@ The system is a **stateless two-endpoint backend** behind an **eight-screen fron
 
 ### Data flow
 
-1. User fills intake → `Profile` (8 fields: name, age, occupation, workHours, topGoal, topFear, targetYear, presentYear)
-2. `POST /simulate` → streaming NDJSON pipeline (5 phases, see below) → `SimulationData`
+1. User fills intake → `Profile` (name, age, occupation, workHours, topGoal, topFear, targetYear, presentYear, optional mbti, optional values dyads)
+2. `POST /simulate` → streaming NDJSON pipeline (4 phases, see below) → `SimulationData`
 3. Frontend caches `SimulationData`; passes it unchanged with every `POST /chat` call
 4. `POST /chat/voice` takes the text reply from `/chat` and streams ElevenLabs mp3 chunks
 
@@ -57,8 +57,6 @@ The orchestrator in [backend/app/services/orchestrator.py](backend/app/services/
 | `event` (×N) | Fills each outline slot into a Checkpoint | Cards stream in |
 | `finalizing` | Writes futureSelfOpening + futureSelfReplies | "Almost done" state |
 | `complete` | Full SimulationData JSON | Screen transitions |
-
-The alternate (low-hours) trajectory is generated in the `ALTERNATE` phase by re-running the planner with a reduced work-intensity constraint.
 
 ### Inference router
 
@@ -93,10 +91,9 @@ interface Checkpoint {
 
 interface SimulationData {
   profile: Profile
-  ages: number[]                              // 5 ages spanning present → targetYear
-  checkpointsHigh: Checkpoint[]              // Current-path (6 cards)
-  checkpointsLow: Checkpoint[]               // Low-hours alternate (6 cards)
-  futureSelfOpening: string                  // 25–50 word voiced opening line
+  agedPortraits: AgedPortrait[]              // up to 5 high-trajectory portraits
+  checkpointsHigh: Checkpoint[]              // current trajectory (typically 6 cards)
+  futureSelfOpening: string                  // voiced reveal line
   futureSelfReplies: Record<string, string>  // 3 canned Q→A pairs
 }
 ```
