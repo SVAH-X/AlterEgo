@@ -11,13 +11,7 @@ import { useTTSPlayer } from "../voice/useTTSPlayer";
 import { MicButton } from "../voice/MicButton";
 import { cloneVoice } from "../lib/voice";
 
-export function ScreenLanding({ onContinue, onJumpTo, setSelfieUploaded, setSelfie }: ScreenProps) {
-  function skip() {
-    setSelfieUploaded(false);
-    setSelfie(null);
-    onJumpTo("intake");
-  }
-
+export function ScreenLanding({ onContinue, onJumpTo }: ScreenProps) {
   return (
     <div style={{ height: "100%", position: "relative", overflow: "hidden" }}>
       <div className="mark-anchor">
@@ -142,38 +136,6 @@ export function ScreenLanding({ onContinue, onJumpTo, setSelfieUploaded, setSelf
         </div>
       </button>
 
-      {/* Skip — pinned bottom-left, stops the hero click from firing. */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          skip();
-        }}
-        className="landing-skip landing-bottom-left"
-        style={{
-          position: "absolute",
-          zIndex: 6,
-          animation: "fade-in 900ms var(--ease) 1900ms both",
-        }}
-      >
-        skip · proceed without a photo →
-      </button>
-
-      {/* Runtime caption — pinned bottom-right */}
-      <div
-        className="landing-bottom-right"
-        style={{
-          position: "absolute",
-          fontFamily: "var(--mono)",
-          fontSize: 10,
-          letterSpacing: "0.22em",
-          textTransform: "uppercase",
-          color: "var(--ink-3)",
-          animation: "fade-in 900ms var(--ease) 1900ms both",
-        }}
-      >
-        ~ 8 min · honest, not motivational
-      </div>
     </div>
   );
 }
