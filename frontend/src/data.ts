@@ -13,6 +13,8 @@ export const AE_DATA: SimulationData = {
     presentYear: 2026,
   },
 
+  agents: [],
+
   agedPortraits: [
     { age: 32, year: 2026, trajectory: "high", imageUrl: null },
     { age: 37, year: 2031, trajectory: "high", imageUrl: null },
