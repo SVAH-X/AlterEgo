@@ -1,6 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.checkpoint import Checkpoint
+from app.models.orchestration import AgentSpec
 from app.models.portrait import AgedPortrait
 from app.models.profile import Profile
 
@@ -13,8 +14,10 @@ class SimulationData(BaseModel):
     """
 
     profile: Profile
-    agedPortraits: list[AgedPortrait]            # 10 entries: 5 high + 5 low
-    checkpointsHigh: list[Checkpoint]            # current-trajectory path (6 cards)
-    checkpointsLow: list[Checkpoint]             # alternate-hours path (6 cards)
-    futureSelfOpening: str                       # 25–50 word voiced reveal line
+    agents: list[AgentSpec] = Field(default_factory=list)   # cast of agents in the user's life
+    # Defaults to [] so chat-only paths (e.g. the Fetch.ai agent, which has
+    # no selfie pipeline) can ground replies without supplying portraits.
+    agedPortraits: list[AgedPortrait] = []       # up to 5 entries (high trajectory)
+    checkpointsHigh: list[Checkpoint]            # current-trajectory path
+    futureSelfOpening: str                       # voiced reveal line
     futureSelfReplies: dict[str, str]            # 3 canned Q→A pairs

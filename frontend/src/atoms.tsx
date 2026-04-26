@@ -1,86 +1,87 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
-// picsum seeds aren't real portraits — the filter/vignette + SVG fallback figure
-// underneath are what make the frame read as "a person".
-export const PORTRAITS: Record<number, string> = {
-  32: "https://picsum.photos/seed/sarah-thirtytwo/900/1200",
-  38: "https://picsum.photos/seed/sarah-thirtyeight/900/1200",
-  45: "https://picsum.photos/seed/sarah-fortyfive/900/1200",
-  52: "https://picsum.photos/seed/sarah-fiftytwo/900/1200",
-  56: "https://picsum.photos/seed/sarah-fiftysix/900/1200",
-};
+interface PortraitProps {
+  className?: string;
+  style?: CSSProperties;
+}
 
-const PORTRAIT_AGES = [32, 38, 45, 52, 56];
-
-export function pickPortraitAge(age: number): number {
-  return PORTRAIT_AGES.reduce(
-    (best, a) => (Math.abs(a - age) < Math.abs(best - age) ? a : best),
-    PORTRAIT_AGES[0],
+export function Portrait({ className = "", style }: PortraitProps) {
+  return (
+    <div
+      className={className}
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(20, 16, 12, 0.4)",
+        border: "1px dashed var(--line-soft)",
+        borderRadius: 8,
+        color: "var(--ink-2)",
+        overflow: "hidden",
+        ...style,
+      }}
+    >
+      <svg
+        viewBox="0 0 240 80"
+        preserveAspectRatio="xMidYMid meet"
+        style={{ width: "62%", maxWidth: 240, opacity: 0.55 }}
+        aria-label="placeholder image"
+      >
+        <line x1="0" y1="0" x2="240" y2="80" stroke="currentColor" strokeOpacity="0.18" />
+        <line x1="240" y1="0" x2="0" y2="80" stroke="currentColor" strokeOpacity="0.18" />
+        <text
+          x="120"
+          y="46"
+          textAnchor="middle"
+          fontFamily="var(--mono, monospace)"
+          fontSize="11"
+          letterSpacing="3"
+          fill="currentColor"
+        >
+          PLACEHOLDER IMAGE
+        </text>
+      </svg>
+    </div>
   );
 }
 
-export type PortraitMood = "dim" | "neutral" | "warm" | "cool" | "golden";
-
-interface PortraitProps {
-  age?: number;
-  mood?: PortraitMood;
+interface PortraitImageProps {
+  src?: string | null;
+  alt: string;
   className?: string;
   style?: CSSProperties;
-  fadeKey?: string | number;
-  blurred?: boolean;
 }
 
-export function Portrait({
-  age = 52,
-  mood = "dim",
-  className = "",
-  style,
-  fadeKey,
-  blurred = false,
-}: PortraitProps) {
-  const portraitAge = pickPortraitAge(age);
-  const src = PORTRAITS[portraitAge];
+// Renders the real portrait when we have a URL; falls back to the placeholder
+// SVG if the URL is missing OR the image fails to load.
+export function PortraitImage({ src, alt, className, style }: PortraitImageProps) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  useEffect(() => {
+    setFailedSrc(null);
+  }, [src]);
+  if (!src || failedSrc === src) {
+    return <Portrait className={className} style={style} />;
+  }
   return (
-    <div className={`portrait ${mood} ${className}`} style={style}>
-      <svg
-        viewBox="0 0 100 130"
-        preserveAspectRatio="xMidYMid slice"
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          opacity: 0.7,
-        }}
-      >
-        <defs>
-          <radialGradient id="fg" cx="50%" cy="40%">
-            <stop offset="0%" stopColor="#3a342c" />
-            <stop offset="100%" stopColor="#0a0908" />
-          </radialGradient>
-        </defs>
-        <rect width="100" height="130" fill="url(#fg)" />
-        <circle cx="50" cy="48" r="18" fill="#1c1814" />
-        <path d="M20 130 Q20 90 50 88 Q80 90 80 130 Z" fill="#1c1814" />
-      </svg>
-      <img
-        key={fadeKey ?? portraitAge}
-        src={src}
-        alt=""
-        style={{
-          position: "absolute",
-          inset: 0,
-          animation: "fade-in-slow 900ms var(--ease) both",
-          // Blur when no selfie was uploaded — don't show a random stock face as "you".
-          filter: blurred ? "blur(28px) saturate(0.7)" : undefined,
-          transform: blurred ? "scale(1.08)" : undefined,
-        }}
-        onError={(e) => {
-          (e.target as HTMLImageElement).style.display = "none";
-        }}
-      />
-    </div>
+    <img
+      key={src}
+      src={src}
+      alt={alt}
+      onError={() => setFailedSrc(src)}
+      className={className}
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        borderRadius: 8,
+        animation: "fade-in-slow 700ms var(--ease) both",
+        ...style,
+      }}
+    />
   );
 }
 
@@ -101,7 +102,7 @@ type CornerPos = "tl" | "tr" | "bl" | "br";
 
 const CORNER_STYLES: Record<CornerPos, CSSProperties> = {
   tl: { top: 28, left: 32 },
-  tr: { top: 28, right: 32 },
+  tr: { top: 28, right: 132 },
   bl: { bottom: 28, left: 32 },
   br: { bottom: 28, right: 32 },
 };
@@ -114,7 +115,19 @@ export function CornerLabel({ pos, children }: { pos: CornerPos; children: React
   );
 }
 
-export function Mark() {
+export function Mark({ onClick }: { onClick?: () => void }) {
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className="mark mark-link"
+        onClick={onClick}
+        aria-label="Go to home screen"
+      >
+        AlterEgo
+      </button>
+    );
+  }
   return <span className="mark">AlterEgo</span>;
 }
 

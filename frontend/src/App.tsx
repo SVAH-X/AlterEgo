@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import type { ComponentType } from "react";
 import { clamp } from "./atoms";
 import { simulateStream } from "./lib/api";
-import type { AgedPortrait, Profile, SimulationData } from "./types";
+import type {
+  AgedPortrait,
+  AgentSpec,
+  Checkpoint,
+  Profile,
+  SimulationData,
+} from "./types";
 import {
   ScreenIntake,
   ScreenLanding,
@@ -32,9 +38,14 @@ export interface FilledOutline {
   year: number;
   severity: number;
   hint: string;
+  primary_actors: string[];
+  visibility: string[];
   filled: boolean;
   pulse: number;
   title?: string;
+  checkpoint?: Checkpoint;
+  /** ms timestamp when this outline entry was filled — drives "active" pulse decay */
+  filledAt?: number;
 }
 
 export interface ScreenProps {
@@ -54,9 +65,13 @@ export interface ScreenProps {
   selfie: Blob | null;
   setSelfie: (s: Blob | null) => void;
   simStreamPhase: SimStreamPhase;
-  agentCount: number;
+  agents: AgentSpec[];
+  /** ms timestamp when each agent_id became known — drives staggered arrival animations */
+  agentArrivedAt: Record<string, number>;
   outline: FilledOutline[];
   latestTitle: string;
+  /** ms timestamp the plan was received — drives ghost-event reveal stagger */
+  planArrivedAt: number | null;
   portraitsDone: number;
   mergePortrait: (p: AgedPortrait) => void;
   runSimulate: () => void;
@@ -120,9 +135,11 @@ export default function App() {
   // Skipped uploads → blurred placeholder portraits (don't show random stock faces as "you").
   const [selfieUploaded, setSelfieUploaded] = useState(false);
   const [simStreamPhase, setSimStreamPhase] = useState<SimStreamPhase>("idle");
-  const [agentCount, setAgentCount] = useState(0);
+  const [agents, setAgents] = useState<AgentSpec[]>([]);
+  const [agentArrivedAt, setAgentArrivedAt] = useState<Record<string, number>>({});
   const [outline, setOutline] = useState<FilledOutline[]>([]);
   const [latestTitle, setLatestTitle] = useState<string>("");
+  const [planArrivedAt, setPlanArrivedAt] = useState<number | null>(null);
   const [portraitsDone, setPortraitsDone] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -186,9 +203,11 @@ export default function App() {
     setSelfieUploaded(false);
     setSelfie(null);
     setSimStreamPhase("idle");
-    setAgentCount(0);
+    setAgents([]);
+    setAgentArrivedAt({});
     setOutline([]);
     setLatestTitle("");
+    setPlanArrivedAt(null);
     setPortraitsDone(0);
     setErrorMessage(null);
     streamingRef.current = false;
@@ -213,11 +232,6 @@ export default function App() {
   // continue arriving after the user advances past Processing.
   const runSimulate = () => {
     if (streamingRef.current) return; // guard against double-start
-    if (!selfie) {
-      setErrorMessage("Selfie required before simulate");
-      setSimStreamPhase("error");
-      return;
-    }
     streamingRef.current = true;
     // Token guards against a restart-mid-stream race: if the user hits
     // restart while events are in flight, restart() flips streamingRef to
@@ -226,9 +240,11 @@ export default function App() {
     const myRunIsAlive = () => streamingRef.current;
     // Reset processing state so a re-run starts fresh.
     setSimStreamPhase("counting");
-    setAgentCount(0);
+    setAgents([]);
+    setAgentArrivedAt({});
     setOutline([]);
     setLatestTitle("");
+    setPlanArrivedAt(null);
     setPortraitsDone(0);
     setErrorMessage(null);
     (async () => {
@@ -236,7 +252,17 @@ export default function App() {
         for await (const ev of simulateStream(profile, selfie)) {
           if (!myRunIsAlive()) break;
           if (ev.phase === "counting") {
-            setAgentCount(ev.agents.length);
+            setAgents(ev.agents);
+            // Stagger arrival timestamps so the constellation reads as agents
+            // walking onstage one-by-one, even though the backend emits the
+            // full list in a single event. ~350ms per agent feels considered.
+            const t0 = performance.now();
+            const stagger = 350;
+            const arrived: Record<string, number> = {};
+            ev.agents.forEach((a, i) => {
+              arrived[a.agent_id] = t0 + i * stagger;
+            });
+            setAgentArrivedAt(arrived);
             setSimStreamPhase("counting");
           } else if (ev.phase === "plan") {
             setOutline(
@@ -244,13 +270,17 @@ export default function App() {
                 year: o.year,
                 severity: o.severity,
                 hint: o.hint,
+                primary_actors: o.primary_actors,
+                visibility: o.visibility,
                 filled: false,
                 pulse: 0,
               })),
             );
+            setPlanArrivedAt(performance.now());
             setSimStreamPhase("plan");
           } else if (ev.phase === "event") {
             const cp = ev.checkpoint;
+            const now = performance.now();
             setOutline((prev) => {
               const next = prev.map((o) => ({ ...o }));
               const idx =
@@ -263,6 +293,8 @@ export default function App() {
                   filled: true,
                   pulse: next[idx].pulse + 1,
                   title: cp.title,
+                  checkpoint: cp,
+                  filledAt: now,
                 };
               }
               return next;
@@ -271,7 +303,7 @@ export default function App() {
             setSimStreamPhase("events");
           } else if (ev.phase === "finalizing") {
             setSimStreamPhase("finalizing");
-            setLatestTitle("weaving the threads — the alternate path, the voice");
+            setLatestTitle("weaving the threads — the voice");
           } else if (ev.phase === "complete") {
             setSimulationState(ev.simulation);
             setTimelineViewed(false);
@@ -329,9 +361,11 @@ export default function App() {
     selfie,
     setSelfie,
     simStreamPhase,
-    agentCount,
+    agents,
+    agentArrivedAt,
     outline,
     latestTitle,
+    planArrivedAt,
     portraitsDone,
     mergePortrait,
     runSimulate,

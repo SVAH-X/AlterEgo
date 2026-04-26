@@ -13,6 +13,8 @@ export const AE_DATA: SimulationData = {
     presentYear: 2026,
   },
 
+  agents: [],
+
   agedPortraits: [
     { age: 32, year: 2026, trajectory: "high", imageUrl: null },
     { age: 37, year: 2031, trajectory: "high", imageUrl: null },
@@ -51,7 +53,7 @@ export const AE_DATA: SimulationData = {
       age: 40,
       title: "Your sister's wedding, on Zoom",
       event: "Q3 board prep lands the same week as the ceremony in Lisbon.",
-      did: "Sent a video. She said she understood.",
+      did: "Sent a video. They said they understood.",
       consequence: "You don't speak again for nine months. Neither of you names why.",
       tone: "neutral",
     },
@@ -85,73 +87,15 @@ export const AE_DATA: SimulationData = {
     },
   ],
 
-  checkpointsLow: [
-    {
-      year: 2028,
-      age: 34,
-      title: "The promotion you turned down",
-      event: "Senior VP role offered. You ask for a week. Then say no.",
-      did: "Took the principal individual contributor track instead. Half the politics.",
-      consequence: "Your manager is annoyed for a quarter, then forgets.",
-      tone: "neutral",
-    },
-    {
-      year: 2030,
-      age: 36,
-      title: "The side project you finally finished",
-      event: "Two years of Saturday mornings on a small brand studio with a friend from school.",
-      did: "Launched it without quitting. Three clients in the first month.",
-      consequence: "It pays for itself by year-end. You start dreaming about it on weekdays.",
-      tone: "good",
-    },
-    {
-      year: 2033,
-      age: 39,
-      title: "The leap, taken on purpose",
-      event: "Studio revenue crosses your salary. Six months of runway saved.",
-      did: "Resigned in person. Cried in the car. Drove to the studio.",
-      consequence: "First year is hard. Second year is yours.",
-      tone: "good",
-    },
-    {
-      year: 2037,
-      age: 43,
-      title: "Your father's last summer",
-      event: "Diagnosis in May. Eight weeks at the lake house through August.",
-      did: "Closed the studio for the season. Took your laptop and didn't open it.",
-      consequence:
-        "You will remember the boat, the smell of the porch, the way he laughed at your impressions. You will not remember what you missed at work.",
-      tone: "good",
-    },
-    {
-      year: 2041,
-      age: 47,
-      title: "The work that became known for being yours",
-      event: "A campaign for a museum gets written about in a way that names you.",
-      did: "Hired a third designer. Kept the studio at six people on purpose.",
-      consequence: "You stop apologizing for the size of what you built.",
-      tone: "good",
-    },
-    {
-      year: 2046,
-      age: 52,
-      title: "Where the simulation ends",
-      event: "A studio with your name on the door. Tired in a way that feels earned.",
-      did: "Built the thing. Lost some years. Kept the ones that mattered.",
-      consequence: "The fear did not come true. Something else did.",
-      tone: "good",
-    },
-  ],
-
   futureSelfOpening:
-    "It's me. I know that's strange. I'm older than you remember being. I want to tell you that you're going to be fine — that's the thing people say — but I think you'd rather I told you what's actually here.",
+    "The years aren't the unit. The unit is what you stopped noticing.",
 
   futureSelfReplies: {
     "What did I get wrong?":
-      "You thought hours were the same as care. They aren't. The work loved you back for a while, and then it stopped, and you didn't notice for a long time. That's the part I'd take back if I could.",
+      "You thought hours were the same as care. They aren't. By the time I noticed, the work had stopped loving me back.",
     "Am I happy?":
-      "Some days. Not the way the magazines mean it. I'm not hollow. I'm not full either. There's a kitchen table I sit at on Sunday mornings that I would not trade. There's a list in a drawer that I would.",
+      "Some days. Not the way the magazines mean it. There's a Sunday kitchen table I wouldn't trade.",
     "What should I change?":
-      "Sleep. I know. Everyone says sleep. But also — call your sister this week, not next month. And the side project you keep almost-starting. Start it badly. Start it on a Saturday. Don't wait for the version of yourself who has time.",
+      "Call your sister this week, not next month. And start the side project badly, on a Saturday.",
   },
 };

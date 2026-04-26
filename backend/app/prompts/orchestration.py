@@ -1,18 +1,17 @@
 """Prompts for the streaming multi-step orchestration.
 
 Phases:
-  1. COUNTING  — profile → list of agents in this person's life
-  2. PLANNING  — profile + agents → outline of events across the horizon
-  3. DETAIL    — for each batch of outline events, generate full Checkpoints
-  4. FINALIZE  — from all checkpoints, write the futureSelfOpening + canned replies
-  5. ALTERNATE — write the alternate-trajectory checkpoints (low work-hours path)
+  1. COUNTING — profile → list of agents in this person's life
+  2. PLANNING — profile + agents → outline of events across the horizon
+  3. DETAIL   — for each batch of outline events, generate full Checkpoints
+  4. FINALIZE — from all checkpoints, write the futureSelfOpening + canned replies
 """
 
 from typing import Optional
 
 from app.models.checkpoint import Checkpoint
 from app.models.orchestration import AgentSpec, OutlineEvent
-from app.models.profile import Profile
+from app.models.profile import Profile, VALID_VALUES_DYADS
 from app.services.state_model import DRIFT_RULES_BLOCK
 
 # ---------------------------------------------------------------------------
@@ -27,6 +26,11 @@ losses people don't plan for. Treat these as baseline, not edge cases.
 - Concrete and specific. A Tuesday, a kitchen counter, the way someone laughed.
 - Compassionate but direct. Compassionate is not the same as softening.
 - Never motivational. No "you've got this." No "anything is possible."
+- When the user faces a choice inside a checkpoint, weight their reaction by \
+their stated values and MBTI when present, not by archetype.
+- Compression is part of dignity. Say the thing once, in the fewest true words.
+- Pronouns are gender-neutral. Refer to the user and every other person with \
+"they/them/their" — never "he/him/his" or "she/her/hers".
 """
 
 # ---------------------------------------------------------------------------
@@ -88,7 +92,7 @@ Profile:
 - work hours per week: {profile.workHours}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
-- target year: {profile.targetYear} (present year: {profile.presentYear})
+- target year: {profile.targetYear} (present year: {profile.presentYear}){_mbti_block(profile)}{_values_block(profile)}
 
 Output the agent list as strict JSON only."""
 
@@ -211,10 +215,9 @@ def render_branched_planning_user(
     agent_lines = "\n".join(
         f"- {a.agent_id} ({a.role}): {a.name} — {a.relationship}" for a in agents
     )
-    mbti_line = f"\n- MBTI: {profile.mbti}" if profile.mbti else ""
     return f"""\
 Profile:
-- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{mbti_line}
+- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
 - horizon: {profile.presentYear} to {profile.targetYear}
@@ -343,10 +346,9 @@ honestly even if the act itself is referenced obliquely.)
 7. The world's macro events (recession, AI displacement, climate, etc.) \
 still happen on their own timing. They just land differently on a \
 person making a different choice."""
-    mbti_line = f"\n- MBTI: {profile.mbti}" if profile.mbti else ""
     return f"""\
 Profile:
-- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{mbti_line}
+- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
 - horizon: {profile.presentYear} to {profile.targetYear} ({profile.targetYear - profile.presentYear} years)
@@ -376,14 +378,23 @@ You receive: the profile, the agent list, the FULL outline (so you know what \
 came before and what's still to come), all checkpoints already written, and \
 the batch you must write now.
 
-Each Checkpoint:
+Each Checkpoint — KEEP IT VERY TIGHT. The agent bundles many cards into one \
+chat message; long cards make the bundle unreadable. Strict per-field budget:
+
 - title: 4–10 words, evocative, no trailing period. Often a definite-article \
 construction ("The promotion you took because you couldn't say no", "The \
 first cardiologist appointment", "Your sister's wedding, on Zoom").
-- event: 1–2 sentences. What happened. If agents speak, name them and quote them.
-- did: 1 sentence. What the user did. Specific verb, specific moment.
-- consequence: 1–2 sentences. What followed. Can be poetic. Lands the moment.
+- event: ONE sentence, ≤18 words. The fact of what happened. No quotes, no \
+metaphor, no scene-setting.
+- did: ONE clause or sentence, ≤10 words. The specific verb. ("Said yes." "Booked the flight." "Didn't call back.")
+- consequence: ONE sentence, ≤18 words. What followed. May be quietly poetic \
+but must land in one breath.
 - tone: "warn" | "neutral" | "good" — match severity (high severity often warn).
+
+HARD CAP: event + did + consequence ≤ 45 words combined. Count them. \
+Cut adjectives, scene-setting, and sub-clauses before you cut beats. \
+Specificity > elaboration. The reader should be able to absorb each card \
+in 5 seconds.
 
 Visibility rule: only agents listed in the event's visibility field can speak \
 or react in that event's narrative. Don't invent reactions from agents who \
@@ -444,7 +455,7 @@ def render_detail_user(
     )
     return f"""\
 Profile:
-- {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk
+- {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
 
@@ -470,29 +481,24 @@ FINALIZE_SYSTEM = f"""\
 You are the finalize agent for AlterEgo. The simulation has run. The user agent \
 has lived through the trajectory. Write:
 
-1. futureSelfOpening — 35–70 words. Voiced. The simulated future self sitting \
-down to talk with their present self for the first time. Starts mid-thought \
-(NOT "Hello"). Lean PHILOSOPHICAL — not narrative recap. The voice of someone \
-who has spent twenty years thinking about what twenty years means. A question \
-they carry. An observation about time, choice, attention, or what they didn't \
-know they were choosing. One concrete detail from the lived trajectory may \
-appear, but framed as reflection, not exposition. Read like a Joan Didion or \
-Annie Ernaux paragraph — interior, weighted, exact. Not motivational. Not \
-plot summary.
+1. futureSelfOpening — 12–22 words. One or two sentences. Voiced. The \
+simulated future self sitting down to talk with their present self for the \
+first time. Starts mid-thought (NOT "Hello"). Lean PHILOSOPHICAL — not \
+narrative recap. A single observation about time, choice, or attention. \
+Read like a Joan Didion sentence — interior, weighted, exact. Brief. Not \
+motivational. Not plot summary.
 
 Bad: "I'm older now. I took the promotion in 2027 and it changed everything."
-Good: "Nobody tells you that the years are not the unit. The unit is what \
-you stopped noticing. There's a Tuesday in 2031 I didn't know was a turning \
-point until I was forty-three. That's the part to listen for."
+Good: "The years aren't the unit. The unit is what you stopped noticing."
 
 2. futureSelfReplies — exactly three keys, exactly these strings:
    - "What did I get wrong?"
    - "Am I happy?"
    - "What should I change?"
-   Each value: 50–100 words. In the future-self voice. Specific. Reference \
-events from the trajectory by detail (not by name). For "What should I \
-change?" give 1–3 concrete actionable nudges grounded in the trajectory, \
-not generic advice.
+   Each value: 15–30 words. Two or three short sentences. In the future-self \
+voice. Specific. Reference one event from the trajectory by detail (not by \
+name). For "What should I change?" give one concrete actionable nudge \
+grounded in the trajectory, not generic advice. Brief.
 
 {TONE_BLOCK}
 
@@ -531,44 +537,56 @@ Output the JSON object only."""
 
 
 # ---------------------------------------------------------------------------
-# ALTERNATE — checkpointsLow (alternate-hours path), as counterfactual on the high path.
+# Personality prompt blocks (MBTI + values). Empty string when absent so they
+# inline-append safely into existing prompt skeletons.
 
-ALTERNATE_SYSTEM = f"""\
-You are the alternate-path agent for AlterEgo. You're given the simulated \
-trajectory the user actually lived (the "high" path — current work hours). \
-Write the alternate trajectory: same length, same span, but the user's work \
-hours dropped to roughly 45/week from the start, and the corresponding life \
-choices followed.
+# Each dyad maps to its two sides as ((left_slug, left_label), (right_slug, right_label)).
+# Keys must mirror VALID_VALUES_DYADS in models/profile.py (asserted below).
+_DYAD_SIDES: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {
+    "respected_liked":        (("respected", "respected"), ("liked", "liked")),
+    "certainty_possibility":  (("certainty", "certainty"), ("possibility", "possibility")),
+    "honest_kind":            (("honest", "honest"), ("kind", "kind")),
+    "movement_roots":         (("movement", "movement"), ("roots", "roots")),
+    "life_scope":             (
+        ("smaller_well", "a smaller life done well"),
+        ("bigger_okay", "a bigger life done okay"),
+    ),
+}
 
-This is NOT a fairy tale. There are still hard moments — a parent's illness, \
-a business setback, a relationship that ends. The good comes earned, not \
-given. Match the original's structure (same number of checkpoints, similar \
-years, parallel themes).
-
-{TONE_BLOCK}
-
-# Output (strict JSON, no prose, no code fence)
-
-[
-  {{ "year": int, "age": int, "title": "...", "event": "...", "did": "...",
-     "consequence": "...", "tone": "warn" | "neutral" | "good" }},
-  ...
-]
-
-Same number of checkpoints as the input. Final checkpoint at the same year. \
-Final tone often "good" but not always — show genuine costs.
-"""
+assert set(_DYAD_SIDES) == set(VALID_VALUES_DYADS), (
+    "values dyad tables out of sync between models/profile.py and prompts/orchestration.py"
+)
 
 
-def render_alternate_user(profile: Profile, checkpoints: list[Checkpoint]) -> str:
-    cps = "\n".join(
-        f"  {c.year}: {c.title}. {c.event} → {c.consequence}" for c in checkpoints
-    )
-    return f"""\
-Profile:
-- {profile.name}, age {profile.age} → {profile.targetYear}, {profile.workHours} hrs/wk on the original path
+def _mbti_block(profile: Profile) -> str:
+    """Returns '\n- MBTI: INTJ' or '' (so it can append after another bullet)."""
+    if not profile.mbti:
+        return ""
+    return f"\n- MBTI: {profile.mbti}"
 
-Original (high-trajectory) lived events:
-{cps}
 
-Now write the alternate trajectory at ~45 hrs/wk. Output the JSON array only."""
+def _values_block(profile: Profile) -> str:
+    """Render the user's value dyad picks as one inline bullet, or '' if none.
+
+    Format: '\n- values (forced-choice): leans LIKED over respected, ...'
+    Only renders dyads whose chosen side is recognized; silently drops the rest.
+    Relies on Profile._normalize_values to drop invalid input upstream.
+    """
+    if not profile.values:
+        return ""
+    parts: list[str] = []
+    for slug, side in profile.values.items():
+        sides = _DYAD_SIDES.get(slug)
+        if not sides:
+            continue
+        (a_slug, a_label), (b_slug, b_label) = sides
+        if side == a_slug:
+            chosen, other = a_label, b_label
+        elif side == b_slug:
+            chosen, other = b_label, a_label
+        else:
+            continue
+        parts.append(f"{chosen.upper()} over {other}")
+    if not parts:
+        return ""
+    return "\n- values (forced-choice): leans " + ", ".join(parts)

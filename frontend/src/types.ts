@@ -10,6 +10,8 @@ export interface Profile {
   topFear: string;
   targetYear: number;
   presentYear: number;
+  mbti?: string | null;
+  values?: Record<string, string> | null;
 }
 
 export interface Checkpoint {
@@ -31,9 +33,9 @@ export interface AgedPortrait {
 
 export interface SimulationData {
   profile: Profile;
+  agents: AgentSpec[];
   agedPortraits: AgedPortrait[];
   checkpointsHigh: Checkpoint[];
-  checkpointsLow: Checkpoint[];
   futureSelfOpening: string;
   futureSelfReplies: Record<string, string>;
 }
