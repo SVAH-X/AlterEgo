@@ -572,3 +572,64 @@ Original (high-trajectory) lived events:
 {cps}
 
 Now write the alternate trajectory at ~45 hrs/wk. Output the JSON array only."""
+
+
+# ---------------------------------------------------------------------------
+# Personality prompt blocks (MBTI + values). Empty string when absent so they
+# inline-append safely into existing prompt skeletons.
+
+# Pretty labels for each dyad side, used to render the values block in
+# natural language. Keys must match VALID_VALUES_DYADS in models/profile.py.
+_DYAD_LABELS: dict[str, dict[str, str]] = {
+    "respected_liked": {"respected": "respected", "liked": "liked"},
+    "certainty_possibility": {"certainty": "certainty", "possibility": "possibility"},
+    "honest_kind": {"honest": "honest", "kind": "kind"},
+    "movement_roots": {"movement": "movement", "roots": "roots"},
+    "life_scope": {
+        "smaller_well": "a smaller life done well",
+        "bigger_okay": "a bigger life done okay",
+    },
+}
+
+# The "other side" of a dyad — used for "X over Y" rendering.
+_DYAD_OTHER: dict[str, dict[str, str]] = {
+    "respected_liked": {"respected": "liked", "liked": "respected"},
+    "certainty_possibility": {
+        "certainty": "possibility", "possibility": "certainty"
+    },
+    "honest_kind": {"honest": "kind", "kind": "honest"},
+    "movement_roots": {"movement": "roots", "roots": "movement"},
+    "life_scope": {
+        "smaller_well": "bigger_okay", "bigger_okay": "smaller_well"
+    },
+}
+
+
+def _mbti_block(profile: Profile) -> str:
+    """Returns '\n- MBTI: INTJ' or '' (so it can append after another bullet)."""
+    if not profile.mbti:
+        return ""
+    return f"\n- MBTI: {profile.mbti}"
+
+
+def _values_block(profile: Profile) -> str:
+    """Render the user's value dyad picks as one inline bullet, or '' if none.
+
+    Format: '\n- values (forced-choice): leans LIKED over respected, ...'
+    Only renders dyads whose chosen side is recognized; silently drops the rest.
+    """
+    if not profile.values:
+        return ""
+    parts: list[str] = []
+    for slug, side in profile.values.items():
+        labels = _DYAD_LABELS.get(slug)
+        others = _DYAD_OTHER.get(slug)
+        if not labels or not others or side not in labels:
+            continue
+        chosen = labels[side]
+        loser_slug = others[side]
+        loser = labels[loser_slug]
+        parts.append(f"{chosen.upper()} over {loser}")
+    if not parts:
+        return ""
+    return "\n- values (forced-choice): leans " + ", ".join(parts)
