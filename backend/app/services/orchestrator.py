@@ -16,14 +16,17 @@ from typing import Optional
 from pydantic import ValidationError
 
 from app.config import get_settings
-from app.models import AgedPortrait, Checkpoint, Profile, SimulationData
+from app.models import AgedPortrait, Checkpoint, ClinicalSummary, Profile, SimulationData
 from app.models.orchestration import AgentSpec, OutlineEvent
 from app.prompts.orchestration import (
+    CLINICAL_SUMMARY_SYSTEM,
     COUNTING_SYSTEM,
     DETAIL_SYSTEM,
     FINALIZE_SYSTEM,
     PLANNING_SYSTEM,
+    parse_clinical_summary,
     render_branched_planning_user,
+    render_clinical_user,
     render_counting_user,
     render_detail_user,
     render_finalize_user,
@@ -106,6 +109,10 @@ async def stream_simulation(
         hero = await hero_task if hero_task is not None else None
         hero_portraits: list[AgedPortrait] = [hero] if hero is not None else []
 
+        clinical = await _generate_clinical_summary(
+            profile, completed, _final_state_hint(completed), router
+        )
+
         sim = SimulationData(
             profile=profile,
             agents=agents,
@@ -113,6 +120,7 @@ async def stream_simulation(
             checkpointsHigh=completed,
             futureSelfOpening=final_payload["futureSelfOpening"],
             futureSelfReplies=final_payload["futureSelfReplies"],
+            clinicalSummary=clinical,
         )
         yield {"phase": "complete", "simulation": sim.model_dump()}
         # AMENDMENT A4: short-circuit on missing API key (silent skip per spec)
@@ -304,6 +312,10 @@ async def stream_branched_simulation(
         hero = await hero_task if hero_task is not None else None
         hero_portraits: list[AgedPortrait] = [hero] if hero is not None else []
 
+        clinical = await _generate_clinical_summary(
+            profile, completed, _final_state_hint(completed), router
+        )
+
         sim = SimulationData(
             profile=profile,
             agents=agents,
@@ -311,6 +323,7 @@ async def stream_branched_simulation(
             checkpointsHigh=completed,
             futureSelfOpening=final_payload["futureSelfOpening"],
             futureSelfReplies=final_payload["futureSelfReplies"],
+            clinicalSummary=clinical,
         )
         yield {"phase": "complete", "simulation": sim.model_dump()}
         # AMENDMENT A4: silent skip on missing key (same as stream_simulation)
@@ -456,6 +469,46 @@ async def _finalize(
             f"finalize: futureSelfReplies missing required keys (got {list(replies.keys()) if isinstance(replies, dict) else 'non-dict'})"
         )
     return data
+
+
+def _final_state_hint(checkpoints: list[Checkpoint]) -> str:
+    """Cheap hint based on the count of warn-toned checkpoints. The clinical
+    prompt uses this only as a directional signal — the model also sees the
+    full trajectory and the health-intake block."""
+    if not checkpoints:
+        return "stable"
+    warn_count = sum(1 for c in checkpoints if c.tone == "warn")
+    if warn_count >= max(3, len(checkpoints) // 2):
+        return "critical"
+    if warn_count >= 1:
+        return "strained"
+    return "stable"
+
+
+async def _generate_clinical_summary(
+    profile: Profile,
+    checkpoints: list[Checkpoint],
+    final_state_hint: str,
+    router: AgentRouter,
+) -> ClinicalSummary | None:
+    """Run the clinical-summary prompt. Returns None on any failure — the
+    reveal screen treats absence as 'no clinical card' and renders its legacy
+    single-column layout."""
+    try:
+        raw = await router.complete(
+            tier=Tier.HIGH_SIGNAL,
+            system=CLINICAL_SUMMARY_SYSTEM,
+            messages=[
+                {
+                    "role": "user",
+                    "content": render_clinical_user(profile, checkpoints, final_state_hint),
+                }
+            ],
+            max_tokens=1000,
+        )
+    except Exception:  # noqa: BLE001 — never break the run on a clinical fail
+        return None
+    return parse_clinical_summary(raw)
 
 
 def _correct_age(cp: Checkpoint, profile: Profile) -> Checkpoint:
