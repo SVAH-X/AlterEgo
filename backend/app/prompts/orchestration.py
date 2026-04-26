@@ -1,11 +1,10 @@
 """Prompts for the streaming multi-step orchestration.
 
 Phases:
-  1. COUNTING  — profile → list of agents in this person's life
-  2. PLANNING  — profile + agents → outline of events across the horizon
-  3. DETAIL    — for each batch of outline events, generate full Checkpoints
-  4. FINALIZE  — from all checkpoints, write the futureSelfOpening + canned replies
-  5. ALTERNATE — write the alternate-trajectory checkpoints (low work-hours path)
+  1. COUNTING — profile → list of agents in this person's life
+  2. PLANNING — profile + agents → outline of events across the horizon
+  3. DETAIL   — for each batch of outline events, generate full Checkpoints
+  4. FINALIZE — from all checkpoints, write the futureSelfOpening + canned replies
 """
 
 from typing import Optional
