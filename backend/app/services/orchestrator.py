@@ -86,28 +86,26 @@ async def stream_simulation(
                     "checkpoint": cp.model_dump(),
                 }
 
-        # 4. Finalize. Emit an explicit phase so the frontend can show progress
-        # instead of appearing to stall after the last event lands.
+        # 4. Finalize + hero portrait, in parallel — both depend only on
+        # `completed`, but produce independent outputs.
         yield {"phase": "finalizing"}
-        final_payload = await _finalize(profile, agents, completed, router)
+        finalize_task = asyncio.create_task(_finalize(profile, agents, completed, router))
 
         ages = _compute_ages(profile)
-        # Generate the hero (target-year, high) portrait BEFORE emitting
-        # `complete` so the Reveal screen has it the moment it mounts —
-        # no placeholder-then-swap. Costs ~5-10s of extra Processing time.
-        hero_portraits: list[AgedPortrait] = []
+        hero_task: asyncio.Task[AgedPortrait | None] | None = None
         if selfie_bytes and settings.gemini_api_key:
-            hero = await generate_aged_portrait(
+            hero_task = _hero_portrait_task(
+                profile=profile,
                 selfie_bytes=selfie_bytes,
                 selfie_mime=selfie_mime,
-                profile=profile,
                 target_age=ages[-1],
-                target_year=profile.targetYear,
-                trajectory="high",
-                relevant_events=completed,
+                completed=completed,
             )
-            if hero.imageUrl is not None:
-                hero_portraits = [hero]
+
+        final_payload = await finalize_task
+        hero = await hero_task if hero_task is not None else None
+        hero_portraits: list[AgedPortrait] = [hero] if hero is not None else []
+
         sim = SimulationData(
             profile=profile,
             agents=agents,
@@ -286,29 +284,29 @@ async def stream_branched_simulation(
                     "checkpoint": cp.model_dump(),
                 }
 
-        # 5. Finalize over the FULL trajectory (kept + new).
+        # 5. Finalize + hero portrait over the FULL trajectory (kept + new),
+        # in parallel — both share `completed` but produce independent outputs.
         yield {"phase": "finalizing"}
-        final_payload = await _finalize(profile, agents, completed, router)
+        finalize_task = asyncio.create_task(_finalize(profile, agents, completed, router))
 
-        # Generate the hero (target-year, high) portrait BEFORE complete so
-        # the rebranched Reveal/Chat have it ready. Same UX rationale as
-        # stream_simulation.
         ages_b = _compute_ages(profile)
-        hero_portraits: list[AgedPortrait] = []
+        hero_task: asyncio.Task[AgedPortrait | None] | None = None
         if selfie_bytes and settings.gemini_api_key:
-            hero = await generate_aged_portrait(
+            hero_task = _hero_portrait_task(
+                profile=profile,
                 selfie_bytes=selfie_bytes,
                 selfie_mime=selfie_mime,
-                profile=profile,
                 target_age=ages_b[-1],
-                target_year=profile.targetYear,
-                trajectory="high",
-                relevant_events=completed,
+                completed=completed,
             )
-            if hero.imageUrl is not None:
-                hero_portraits = [hero]
+
+        final_payload = await finalize_task
+        hero = await hero_task if hero_task is not None else None
+        hero_portraits: list[AgedPortrait] = [hero] if hero is not None else []
+
         sim = SimulationData(
             profile=profile,
+            agents=agents,
             agedPortraits=hero_portraits,
             checkpointsHigh=completed,
             futureSelfOpening=final_payload["futureSelfOpening"],
@@ -473,6 +471,45 @@ def _correct_age(cp: Checkpoint, profile: Profile) -> Checkpoint:
 # Portrait fan-out
 
 PORTRAIT_CONCURRENCY = 3  # Gemini image gen rate-limits aggressively per minute
+_PORTRAIT_SEM: asyncio.Semaphore | None = None
+
+
+def _portrait_sem() -> asyncio.Semaphore:
+    """Lazy module-scope semaphore — created on first call so it binds to the
+    running event loop (constructing at import time can break under multiple
+    loops in tests)."""
+    global _PORTRAIT_SEM
+    if _PORTRAIT_SEM is None:
+        _PORTRAIT_SEM = asyncio.Semaphore(PORTRAIT_CONCURRENCY)
+    return _PORTRAIT_SEM
+
+
+def _hero_portrait_task(
+    *,
+    profile: Profile,
+    selfie_bytes: bytes,
+    selfie_mime: str,
+    target_age: int,
+    completed: list[Checkpoint],
+) -> "asyncio.Task[AgedPortrait | None]":
+    """Schedule the hero (target-year, high) portrait. Returns the Task so the
+    caller can await it concurrently with finalize. Uses the shared portrait
+    semaphore so it never overlaps the post-complete fan-out beyond the cap.
+    Returns None when generation fails (caller treats that as 'no hero')."""
+    async def _run() -> AgedPortrait | None:
+        async with _portrait_sem():
+            p = await generate_aged_portrait(
+                selfie_bytes=selfie_bytes,
+                selfie_mime=selfie_mime,
+                profile=profile,
+                target_age=target_age,
+                target_year=profile.targetYear,
+                trajectory="high",
+                relevant_events=completed,
+            )
+        return p if p.imageUrl is not None else None
+
+    return asyncio.create_task(_run())
 
 
 async def _fan_out_portraits(
@@ -488,7 +525,7 @@ async def _fan_out_portraits(
     Successes are emitted as 'portrait' events with the AgedPortrait inline.
     Concurrency is capped via PORTRAIT_CONCURRENCY to avoid per-minute 429s."""
     span = profile.targetYear - profile.presentYear
-    sem = asyncio.Semaphore(PORTRAIT_CONCURRENCY)
+    sem = _portrait_sem()
 
     def _events_up_to(cps: list[Checkpoint], year: int) -> list[Checkpoint]:
         return [c for c in cps if c.year <= year]
@@ -557,7 +594,7 @@ async def _fan_out_portraits_branched(
 
     # Lookup table for preserved high portraits (year -> portrait).
     by_year_high = {p.year: p for p in original_portraits if p.trajectory == "high"}
-    sem = asyncio.Semaphore(PORTRAIT_CONCURRENCY)
+    sem = _portrait_sem()
 
     preserved_indices: set[int] = set()
     for i, _age in enumerate(ages):
