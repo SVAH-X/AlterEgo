@@ -49,7 +49,17 @@ export async function* simulateBranchStream(
   form.append("profile", JSON.stringify(profile));
   form.append("intervention_year", String(interventionYear));
   form.append("intervention_text", interventionText);
-  form.append("original_simulation", JSON.stringify(originalSimulation));
+  // Strip the base64 image bytes — the backend only needs the (year, trajectory)
+  // metadata to decide which portraits to skip regenerating; the FE retains
+  // the full images locally and re-attaches them on `phase: complete`.
+  const slim: SimulationData = {
+    ...originalSimulation,
+    agedPortraits: originalSimulation.agedPortraits.map((p) => ({
+      ...p,
+      imageUrl: null,
+    })),
+  };
+  form.append("original_simulation", JSON.stringify(slim));
   if (selfie) form.append("selfie", selfie, "selfie.jpg");
   yield* readNDJSON(
     await fetch(`${BASE}/simulate/branch`, {

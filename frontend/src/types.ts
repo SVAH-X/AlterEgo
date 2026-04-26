@@ -33,6 +33,7 @@ export interface AgedPortrait {
 
 export interface SimulationData {
   profile: Profile;
+  agents: AgentSpec[];
   agedPortraits: AgedPortrait[];
   checkpointsHigh: Checkpoint[];
   futureSelfOpening: string;
