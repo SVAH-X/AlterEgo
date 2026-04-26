@@ -193,7 +193,7 @@ const INTAKE_FIELDS: IntakeField[] = [
   { key: "name", label: "What should I call you?", placeholder: "Your name", type: "text" },
   { key: "age", label: "How old are you, today?", placeholder: "32", type: "number" },
   { key: "occupation", label: "What do you do for work?", placeholder: "Marketing director", type: "text" },
-  { key: "workHours", label: "Hours per week, honestly.", placeholder: "65", type: "number" },
+  { key: "workHours", label: "Working hours per week, honestly.", placeholder: "65", type: "number" },
   {
     key: "topGoal",
     label: "What do you want, more than anything?",
