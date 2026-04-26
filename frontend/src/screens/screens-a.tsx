@@ -11,13 +11,7 @@ import { useTTSPlayer } from "../voice/useTTSPlayer";
 import { MicButton } from "../voice/MicButton";
 import { cloneVoice } from "../lib/voice";
 
-export function ScreenLanding({
-  onContinue,
-  onJumpTo,
-  onRestart,
-  setSelfieUploaded,
-  setSelfie,
-}: ScreenProps) {
+export function ScreenLanding({ onContinue, onJumpTo, setSelfieUploaded, setSelfie }: ScreenProps) {
   function skip() {
     setSelfieUploaded(false);
     setSelfie(null);
@@ -27,7 +21,7 @@ export function ScreenLanding({
   return (
     <div style={{ height: "100%", position: "relative", overflow: "hidden" }}>
       <div className="mark-anchor">
-        <Mark onClick={onRestart} />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       {/* Whole hero advances to the selfie choice screen. */}
       <button
@@ -182,9 +176,49 @@ export function ScreenLanding({
   );
 }
 
+type DyadSide = { slug: string; label: string };
+type DyadSpec = { slug: string; left: DyadSide; right: DyadSide };
+
+const VALUES_DYADS: DyadSpec[] = [
+  {
+    slug: "respected_liked",
+    left: { slug: "respected", label: "Respected" },
+    right: { slug: "liked", label: "Liked" },
+  },
+  {
+    slug: "certainty_possibility",
+    left: { slug: "certainty", label: "Certainty" },
+    right: { slug: "possibility", label: "Possibility" },
+  },
+  {
+    slug: "honest_kind",
+    left: { slug: "honest", label: "Honest" },
+    right: { slug: "kind", label: "Kind" },
+  },
+  {
+    slug: "movement_roots",
+    left: { slug: "movement", label: "Movement" },
+    right: { slug: "roots", label: "Roots" },
+  },
+  {
+    slug: "life_scope",
+    left: { slug: "smaller_well", label: "A smaller life done well" },
+    right: { slug: "bigger_okay", label: "A bigger life done okay" },
+  },
+];
+
+const MBTI_TYPES: string[] = [
+  "INTJ", "INTP", "ENTJ", "ENTP",
+  "INFJ", "INFP", "ENFJ", "ENFP",
+  "ISTJ", "ISFJ", "ESTJ", "ESFJ",
+  "ISTP", "ISFP", "ESTP", "ESFP",
+];
+
 type IntakeField =
   | { key: keyof Profile; label: string; placeholder: string; type: "text" | "textarea"; suffix?: string }
-  | { key: keyof Profile; label: string; placeholder: string; type: "number"; suffix?: string };
+  | { key: keyof Profile; label: string; placeholder: string; type: "number"; suffix?: string }
+  | { key: "mbti"; label: string; type: "mbti"; suffix?: string }
+  | { key: "values"; label: string; type: "dyads"; dyads: DyadSpec[]; suffix?: string };
 
 const INTAKE_FIELDS: IntakeField[] = [
   { key: "name", label: "What should I call you?", placeholder: "Your name", type: "text" },
@@ -204,6 +238,18 @@ const INTAKE_FIELDS: IntakeField[] = [
     type: "textarea",
   },
   {
+    key: "mbti",
+    label: "Your MBTI, if you know it.",
+    type: "mbti",
+    suffix: "Skip if you don't. It's optional — a hint, not a label.",
+  },
+  {
+    key: "values",
+    label: "Pick one in each pair. There's no right answer — just yours.",
+    type: "dyads",
+    dyads: VALUES_DYADS,
+  },
+  {
     key: "targetYear",
     label: "How many years should I look ahead?",
     placeholder: "20",
@@ -218,13 +264,7 @@ function autoSizeTextarea(el: HTMLTextAreaElement | null) {
   el.style.height = `${el.scrollHeight}px`;
 }
 
-export function ScreenIntake({
-  onContinue,
-  onRestart,
-  profile,
-  setProfile,
-  pushVoiceSample,
-}: ScreenProps) {
+export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVoiceSample }: ScreenProps) {
   const [step, setStep] = useState(0);
   const cur = INTAKE_FIELDS[step];
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -248,6 +288,11 @@ export function ScreenIntake({
   }
 
   function next() {
+    if (cur.type === "dyads") {
+      const picks = profile.values ?? {};
+      const allAnswered = cur.dyads.every((d) => Boolean(picks[d.slug]));
+      if (!allAnswered) return;
+    }
     tts.stop();
     if (step < INTAKE_FIELDS.length - 1) setStep(step + 1);
     else onContinue();
@@ -294,11 +339,13 @@ export function ScreenIntake({
   // Number inputs show "" for 0 so the field reads as empty when cleared.
   // Text inputs show their string verbatim (empty string already renders empty).
   const displayValue =
-    cur.type === "number"
-      ? value && Number(value) !== 0
-        ? String(value)
-        : ""
-      : ((value as string | undefined) ?? "");
+    cur.type === "mbti" || cur.type === "dyads"
+      ? ""
+      : cur.type === "number"
+        ? value && Number(value) !== 0
+          ? String(value)
+          : ""
+        : ((value as string | undefined) ?? "");
 
   // Re-measure the textarea when entering a textarea step or when the value
   // changes (e.g., paste). Auto-resize on input also runs in onChange.
@@ -309,7 +356,7 @@ export function ScreenIntake({
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div className="mark-anchor">
-        <Mark onClick={onRestart} />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       <div
         style={{
@@ -358,6 +405,22 @@ export function ScreenIntake({
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) next();
               }}
             />
+          ) : cur.type === "mbti" ? (
+            <MbtiPicker
+              value={profile.mbti ?? null}
+              onPick={(t) => setProfile({ ...profile, mbti: t })}
+            />
+          ) : cur.type === "dyads" ? (
+            <DyadsPicker
+              dyads={cur.dyads}
+              value={profile.values ?? {}}
+              onPick={(slug, side) =>
+                setProfile({
+                  ...profile,
+                  values: { ...(profile.values ?? {}), [slug]: side },
+                })
+              }
+            />
           ) : (
             <input
               className="field"
@@ -374,13 +437,15 @@ export function ScreenIntake({
             />
           )}
 
-          <MicButton
-            onTranscript={(text) => applyValue(text, "voice")}
-            onRecorded={(blob, durationMs) => {
-              onRecorded(blob, durationMs);
-              pushVoiceSample(blob);
-            }}
-          />
+          {cur.type !== "mbti" && cur.type !== "dyads" && (
+            <MicButton
+              onTranscript={(text) => applyValue(text, "voice")}
+              onRecorded={(blob, durationMs) => {
+                onRecorded(blob, durationMs);
+                pushVoiceSample(blob);
+              }}
+            />
+          )}
 
           {cur.suffix && (
             <div
@@ -439,6 +504,119 @@ export function ScreenIntake({
   );
 }
 
+function MbtiPicker({
+  value,
+  onPick,
+}: {
+  value: string | null;
+  onPick: (mbti: string | null) => void;
+}) {
+  return (
+    <div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 12,
+        }}
+      >
+        {MBTI_TYPES.map((t) => {
+          const selected = value === t;
+          return (
+            <button
+              key={t}
+              type="button"
+              onClick={() => onPick(selected ? null : t)}
+              className="under"
+              style={{
+                padding: "14px 0",
+                fontFamily: "var(--mono)",
+                fontSize: 15,
+                letterSpacing: "0.06em",
+                color: selected ? "var(--bg)" : "var(--ink-1)",
+                background: selected ? "var(--ink-1)" : "transparent",
+                border: "1px solid var(--ink-3)",
+                borderRadius: 4,
+                cursor: "pointer",
+                transition:
+                  "background 200ms var(--ease), color 200ms var(--ease)",
+              }}
+            >
+              {t}
+            </button>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={() => onPick(null)}
+        className="under"
+        style={{
+          marginTop: 18,
+          color: value == null ? "var(--ink-1)" : "var(--ink-3)",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          fontStyle: "italic",
+        }}
+      >
+        skip / clear
+      </button>
+    </div>
+  );
+}
+
+function DyadsPicker({
+  dyads,
+  value,
+  onPick,
+}: {
+  dyads: DyadSpec[];
+  value: Record<string, string>;
+  onPick: (slug: string, side: string) => void;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {dyads.map((d) => {
+        const chosen = value[d.slug];
+        const renderSide = (side: DyadSide) => {
+          const selected = chosen === side.slug;
+          return (
+            <button
+              key={side.slug}
+              type="button"
+              onClick={() => onPick(d.slug, side.slug)}
+              style={{
+                flex: 1,
+                padding: "14px 18px",
+                fontFamily: "var(--serif)",
+                fontStyle: "italic",
+                fontSize: 18,
+                color: selected ? "var(--bg)" : "var(--ink-1)",
+                background: selected ? "var(--ink-1)" : "transparent",
+                border: "1px solid var(--ink-3)",
+                borderRadius: 4,
+                cursor: "pointer",
+                textAlign: "center",
+                transition:
+                  "background 200ms var(--ease), color 200ms var(--ease)",
+              }}
+            >
+              {side.label}
+            </button>
+          );
+        };
+        return (
+          <div key={d.slug} style={{ display: "flex", gap: 10 }}>
+            {renderSide(d.left)}
+            {renderSide(d.right)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const PHASE_LABELS: Record<SimStreamPhase, string> = {
   idle: "waiting to begin",
   counting: "drafting the people in your life",
@@ -451,7 +629,7 @@ const PHASE_LABELS: Record<SimStreamPhase, string> = {
 
 export function ScreenProcessing({
   onContinue,
-  onRestart,
+  onJumpTo,
   profile,
   simStreamPhase,
   agentCount,
@@ -568,7 +746,7 @@ export function ScreenProcessing({
       }}
     >
       <div className="mark-anchor">
-        <Mark onClick={onRestart} />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       <svg
         width="640"
@@ -788,7 +966,7 @@ export function ScreenProcessing({
 
 type RevealPhase = 0 | 1 | 2 | 3;
 
-export function ScreenReveal({ onContinue, onRestart, profile, simulation }: ScreenProps) {
+export function ScreenReveal({ onContinue, onJumpTo, profile, simulation }: ScreenProps) {
   const [phase, setPhase] = useState<RevealPhase>(0);
   const { voiceMode, clonedVoiceId } = useVoice();
   const voicePrimed = useVoicePrimed();
@@ -834,7 +1012,7 @@ export function ScreenReveal({ onContinue, onRestart, profile, simulation }: Scr
           pointerEvents: phase >= 2 ? "auto" : "none",
         }}
       >
-        <Mark onClick={onRestart} />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       {/* Scroll container — content centers when it fits, scrolls when it doesn't */}
       <div

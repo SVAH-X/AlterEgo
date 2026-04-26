@@ -38,14 +38,24 @@ class HostedBackend:
         max_tokens: int,
         temperature: float,
     ) -> str:
-        # TODO: enable prompt caching on `system` once character cards stabilize.
+        # Wrap the system prompt as a cache-controlled block so Anthropic
+        # caches the (large, repeated) prefix across calls within a session.
+        # System prompts under the model's minimum cache size silently fall
+        # through to non-cached pricing — no correctness impact.
         # Newer Anthropic models (Opus 4.7+) reject `temperature` as deprecated;
         # use the default sampling and ignore the caller's hint.
         anthropic_tier = tier if tier != Tier.NOISE else Tier.PEERS
         model = self._anthropic_models[anthropic_tier]
+        cached_system = [
+            {
+                "type": "text",
+                "text": system,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
         resp = await self._anthropic.messages.create(
             model=model,
-            system=system,
+            system=cached_system,
             messages=messages,
             max_tokens=max_tokens,
         )

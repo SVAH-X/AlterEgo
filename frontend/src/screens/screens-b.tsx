@@ -21,7 +21,7 @@ interface ChatMessage {
   done: boolean;
 }
 
-export function ScreenChat({ onContinue, onRestart, profile, simulation }: ScreenProps) {
+export function ScreenChat({ onContinue, onJumpTo, profile, simulation }: ScreenProps) {
   const olderAge =
     (Number(profile.age) || 32) +
     ((Number(profile.targetYear) - Number(profile.presentYear)) || 20);
@@ -130,7 +130,7 @@ export function ScreenChat({ onContinue, onRestart, profile, simulation }: Scree
       }}
     >
       <div className="mark-anchor">
-        <Mark onClick={onRestart} />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       <div
         style={{
@@ -335,7 +335,7 @@ function Message({ m }: { m: ChatMessage }) {
 
 export function ScreenTimeline({
   onContinue,
-  onRestart,
+  onJumpTo,
   profile,
   simulation,
   setSimulation,
@@ -513,10 +513,17 @@ export function ScreenTimeline({
         } else if (ev.phase === "finalizing") {
           setRewriting((r) => (r ? { ...r, phase: "stitching it together" } : null));
         } else if (ev.phase === "complete") {
-          // Reset agedPortraits to [] in the freshly-completed simulation;
-          // post-complete portrait events below will fill them in via
-          // mergePortrait, mirroring the App-level runSimulate flow.
-          setSimulation({ ...ev.simulation, agedPortraits: [] });
+          // The backend no longer re-emits pre-intervention high portraits to
+          // save upload bytes — it strips them out. We retain the originals
+          // locally and re-merge them here so the slider/encore screens still
+          // have early-life faces.
+          const preservedHigh = (originalSim.agedPortraits ?? []).filter(
+            (p) => p.trajectory === "high" && p.year < cp.year,
+          );
+          setSimulation({
+            ...ev.simulation,
+            agedPortraits: [...preservedHigh, ...ev.simulation.agedPortraits],
+          });
           setRewriting(null);
           // Drop the user at the end of the new trajectory, no replay — they
           // just watched it materialize. They can scrub or intervene again.
@@ -552,7 +559,7 @@ export function ScreenTimeline({
       }}
     >
       <div className="mark-anchor">
-        <Mark onClick={onRestart} />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       {rewriting && (
         <div
@@ -1175,7 +1182,7 @@ function GeneratingCard({
   );
 }
 
-export function ScreenEnd({ onRestart, profile, simulation }: ScreenProps) {
+export function ScreenEnd({ onRestart, onJumpTo, profile, simulation }: ScreenProps) {
   const baseAge = profile.age || 32;
   const startYear = profile.presentYear || 2026;
   const endYear = profile.targetYear || 2046;
@@ -1216,7 +1223,7 @@ export function ScreenEnd({ onRestart, profile, simulation }: ScreenProps) {
       }}
     >
       <div className="mark-anchor">
-        <Mark onClick={onRestart} />
+        <Mark onClick={() => onJumpTo("landing")} />
       </div>
       <div
         style={{

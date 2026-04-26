@@ -364,15 +364,15 @@ textarea.field.auto-grow {
   margin-right: 8px;
   color: var(--accent);
 }
-.mark-button {
+.mark-link {
   appearance: none;
-  background: transparent;
+  background: none;
   border: none;
   padding: 0;
   cursor: pointer;
-  transition: color 200ms var(--ease);
+  transition: color 300ms var(--ease);
 }
-.mark-button:hover { color: var(--ink); }
+.mark-link:hover { color: var(--ink); }
 
 /* corner labels — viewport-pinned so they survive in-screen scroll */
 .corner {
