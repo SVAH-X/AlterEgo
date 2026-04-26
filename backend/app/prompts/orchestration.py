@@ -88,7 +88,7 @@ Profile:
 - work hours per week: {profile.workHours}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
-- target year: {profile.targetYear} (present year: {profile.presentYear})
+- target year: {profile.targetYear} (present year: {profile.presentYear}){_mbti_block(profile)}{_values_block(profile)}
 
 Output the agent list as strict JSON only."""
 
@@ -211,10 +211,9 @@ def render_branched_planning_user(
     agent_lines = "\n".join(
         f"- {a.agent_id} ({a.role}): {a.name} — {a.relationship}" for a in agents
     )
-    mbti_line = f"\n- MBTI: {profile.mbti}" if profile.mbti else ""
     return f"""\
 Profile:
-- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{mbti_line}
+- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
 - horizon: {profile.presentYear} to {profile.targetYear}
@@ -343,10 +342,9 @@ honestly even if the act itself is referenced obliquely.)
 7. The world's macro events (recession, AI displacement, climate, etc.) \
 still happen on their own timing. They just land differently on a \
 person making a different choice."""
-    mbti_line = f"\n- MBTI: {profile.mbti}" if profile.mbti else ""
     return f"""\
 Profile:
-- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{mbti_line}
+- name: {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
 - horizon: {profile.presentYear} to {profile.targetYear} ({profile.targetYear - profile.presentYear} years)
@@ -444,7 +442,7 @@ def render_detail_user(
     )
     return f"""\
 Profile:
-- {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk
+- {profile.name}, age {profile.age}, {profile.occupation}, {profile.workHours} hrs/wk{_mbti_block(profile)}{_values_block(profile)}
 - top goal: {profile.topGoal}
 - top fear: {profile.topFear}
 
