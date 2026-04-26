@@ -43,7 +43,7 @@ async def test_generate_clinical_summary_returns_parsed_object() -> None:
         "finalHealthState": "strained",
     })
     router = _FakeRouter(response)
-    cs = await _generate_clinical_summary(_profile(), _checkpoints(), "strained", router)
+    cs = await _generate_clinical_summary(_profile(), _checkpoints(), router)
     assert cs is not None
     assert cs.finalHealthState == "strained"
     assert len(cs.riskFactors) == 2
@@ -53,5 +53,5 @@ async def test_generate_clinical_summary_returns_parsed_object() -> None:
 @pytest.mark.asyncio
 async def test_generate_clinical_summary_returns_none_on_garbage() -> None:
     router = _FakeRouter("totally not json")
-    cs = await _generate_clinical_summary(_profile(), _checkpoints(), "stable", router)
+    cs = await _generate_clinical_summary(_profile(), _checkpoints(), router)
     assert cs is None

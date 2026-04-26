@@ -3,7 +3,7 @@ import type { FilledOutline, ScreenProps, SimStreamPhase } from "../App";
 import { clamp, Mark, Meta, PortraitImage, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
 import { nearestPortrait } from "../lib/portraits";
-import type { AgentSpec, Profile } from "../types";
+import type { AgentSpec, ClinicalSummary, Profile } from "../types";
 import romanStatue from "../assets/roman-half-blur.png";
 import darkClouds from "../assets/dark-grey-clouds-over-the-ocean.jpg";
 import { useVoice, useVoicePrimed } from "../voice/VoiceContext";
@@ -485,13 +485,13 @@ function ClinicalCard({
   summary,
   visible,
 }: {
-  summary: NonNullable<import("../types").SimulationData["clinicalSummary"]>;
+  summary: ClinicalSummary;
   visible: boolean;
 }) {
   const stateColor: Record<string, string> = {
-    stable: "var(--good, var(--accent))",
+    stable: "var(--good)",
     strained: "var(--accent)",
-    critical: "var(--warn, var(--accent))",
+    critical: "var(--warn)",
   };
   return (
     <div

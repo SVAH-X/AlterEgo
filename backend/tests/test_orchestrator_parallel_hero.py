@@ -74,7 +74,7 @@ async def test_hero_runs_concurrent_with_finalize(monkeypatch) -> None:
         return [Checkpoint(year=2040, age=46, title="t", event="e", did="d",
                            consequence="c", tone="neutral") for _ in batch]
 
-    async def fake_clinical(profile, checkpoints, hint, router):
+    async def fake_clinical(profile, checkpoints, router):
         return None
 
     monkeypatch.setattr(orch, "_plan_branched_outline", fake_plan)

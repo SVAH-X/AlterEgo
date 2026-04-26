@@ -595,10 +595,7 @@ def _values_block(profile: Profile) -> str:
     return "\n- values (forced-choice): leans " + ", ".join(parts)
 
 
-# Display labels for each health field. Keys mirror the Profile bucket strings
-# (so the block reads back what the user actually picked, not a re-encoded
-# version). Two-section layout: Body / Mind. Body or Mind subhead is omitted
-# when none of its fields are set.
+# Render the user's actual bucket strings (no re-encoding) so the model sees what they picked.
 
 _HEALTH_BODY_LABELS: list[tuple[str, str, str]] = [
     # (Profile attribute, prefix shown to the model, suffix unit)

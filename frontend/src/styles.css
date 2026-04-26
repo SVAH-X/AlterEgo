@@ -16,6 +16,7 @@
   --accent-line: oklch(0.74 0.09 65 / 0.35);
   --teal: oklch(0.7 0.05 200);
   --warn: oklch(0.62 0.09 30);
+  --good: oklch(0.68 0.09 145);
 
   --serif: "Cormorant Garamond", "EB Garamond", Georgia, serif;
   --sans: "Inter", "Helvetica Neue", system-ui, sans-serif;

@@ -84,7 +84,6 @@ def initial_state(profile: Profile) -> State:
     # Social isolation: rises with work intensity.
     social_isolation = 0.3 + max(0.0, work_intensity - 0.6) * 0.3
 
-    # Apply optional health-intake deltas. None values contribute nothing.
     health_strain += _SLEEP_HEALTH_DELTA.get(profile.sleepHours, 0.0)
     health_strain += _EXERCISE_HEALTH_DELTA.get(profile.exerciseDays, 0.0)
     health_strain += _CAFFEINE_HEALTH_DELTA.get(profile.caffeineCups, 0.0)
@@ -107,7 +106,7 @@ def initial_state(profile: Profile) -> State:
     )
 
 
-# Health-intake delta tables. Anything not listed contributes 0.
+# Health-intake delta lookup tables.
 _SLEEP_HEALTH_DELTA: dict[str | None, float] = {
     "<5": 0.15, "5-6": 0.08, "6-7": 0.02, "7-8": -0.05, "8+": -0.03,
 }

@@ -93,6 +93,7 @@ async def stream_simulation(
         # `completed`, but produce independent outputs.
         yield {"phase": "finalizing"}
         finalize_task = asyncio.create_task(_finalize(profile, agents, completed, router))
+        clinical_task = asyncio.create_task(_generate_clinical_summary(profile, completed, router))
 
         ages = _compute_ages(profile)
         hero_task: asyncio.Task[AgedPortrait | None] | None = None
@@ -108,10 +109,7 @@ async def stream_simulation(
         final_payload = await finalize_task
         hero = await hero_task if hero_task is not None else None
         hero_portraits: list[AgedPortrait] = [hero] if hero is not None else []
-
-        clinical = await _generate_clinical_summary(
-            profile, completed, _final_state_hint(completed), router
-        )
+        clinical = await clinical_task
 
         sim = SimulationData(
             profile=profile,
@@ -296,6 +294,7 @@ async def stream_branched_simulation(
         # in parallel — both share `completed` but produce independent outputs.
         yield {"phase": "finalizing"}
         finalize_task = asyncio.create_task(_finalize(profile, agents, completed, router))
+        clinical_task = asyncio.create_task(_generate_clinical_summary(profile, completed, router))
 
         ages_b = _compute_ages(profile)
         hero_task: asyncio.Task[AgedPortrait | None] | None = None
@@ -311,10 +310,7 @@ async def stream_branched_simulation(
         final_payload = await finalize_task
         hero = await hero_task if hero_task is not None else None
         hero_portraits: list[AgedPortrait] = [hero] if hero is not None else []
-
-        clinical = await _generate_clinical_summary(
-            profile, completed, _final_state_hint(completed), router
-        )
+        clinical = await clinical_task
 
         sim = SimulationData(
             profile=profile,
@@ -488,7 +484,6 @@ def _final_state_hint(checkpoints: list[Checkpoint]) -> str:
 async def _generate_clinical_summary(
     profile: Profile,
     checkpoints: list[Checkpoint],
-    final_state_hint: str,
     router: AgentRouter,
 ) -> ClinicalSummary | None:
     """Run the clinical-summary prompt. Returns None on any failure — the
@@ -501,7 +496,7 @@ async def _generate_clinical_summary(
             messages=[
                 {
                     "role": "user",
-                    "content": render_clinical_user(profile, checkpoints, final_state_hint),
+                    "content": render_clinical_user(profile, checkpoints, _final_state_hint(checkpoints)),
                 }
             ],
             max_tokens=1000,
