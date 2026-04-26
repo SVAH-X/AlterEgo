@@ -243,8 +243,13 @@ async def stream_branched_simulation(
     kept = [c for c in original_simulation.checkpointsHigh if c.year < iv_year]
 
     try:
-        # 1. Re-derive agents (we don't persist them in SimulationData).
-        agents = await _count_agents(profile, router)
+        # 1. Reuse the cast from the original simulation if present; only
+        # fall back to a fresh count for pre-change sessions that didn't
+        # persist agents (defensive — costs an LLM call when it triggers).
+        if original_simulation.agents:
+            agents = list(original_simulation.agents)
+        else:
+            agents = await _count_agents(profile, router)
         yield {"phase": "counting", "agents": [a.model_dump() for a in agents]}
 
         # 2. Plan only post-intervention years.
