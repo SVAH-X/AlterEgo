@@ -780,6 +780,14 @@ export function ScreenProcessing({
     now,
     active: simStreamPhase !== "idle" && simStreamPhase !== "error",
   });
+  // Active for the constellation: paced view, not raw outline.
+  const pacedActiveIdx = queue.currentOutlineIdx;
+  // For the SVG node-pulse, use the paced view so the highlighted actors match
+  // the visible text on the right column. Falls back to the raw `activeIdx`
+  // before the queue has dispensed anything (so first-event arrival animation
+  // still plays immediately).
+  const svgActiveIdx = pacedActiveIdx >= 0 ? pacedActiveIdx : activeIdx;
+  const svgActive = svgActiveIdx >= 0 ? outline[svgActiveIdx] : active;
   // ---- per-frame derivations (cheap; no useMemo because `now` invalidates every tick) ----
 
   function arrivalAlpha(agentId: string): number {
@@ -788,9 +796,9 @@ export function ScreenProcessing({
     return clamp((now - t) / ARRIVAL_FADE_MS, 0, 1);
   }
   function activePulse(agentId: string): number {
-    if (!active || active.filledAt === undefined) return 0;
-    if (!active.primary_actors.includes(agentId)) return 0;
-    const dt = now - active.filledAt;
+    if (!svgActive || svgActive.filledAt === undefined) return 0;
+    if (!svgActive.primary_actors.includes(agentId)) return 0;
+    const dt = now - svgActive.filledAt;
     if (dt < 0 || dt > EVENT_PULSE_MS) return 0;
     const x = dt / EVENT_PULSE_MS;
     return Math.max(0, 1 - x) * (1 + 0.3 * Math.sin(dt / 90));
@@ -971,7 +979,7 @@ export function ScreenProcessing({
         style={{
           flex: 1,
           display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) 360px",
+          gridTemplateColumns: "minmax(0, 1fr) 420px",
           gap: 24,
           padding: "92px 40px 30px 40px",
           minHeight: 0,
@@ -982,7 +990,13 @@ export function ScreenProcessing({
             <svg
               viewBox={`0 0 ${GRAPH_W} ${GRAPH_H}`}
               preserveAspectRatio="xMidYMid meet"
-              style={{ width: "100%", height: "100%", display: "block" }}
+              style={{
+                width: "100%",
+                height: "100%",
+                display: "block",
+                opacity: phase === 3 ? 0.85 : 1,
+                transition: "opacity 1.4s var(--ease)",
+              }}
             >
               <defs>
                 <radialGradient id="haze" cx="50%" cy="50%">
@@ -1152,7 +1166,7 @@ export function ScreenProcessing({
               from={startYear}
               to={endYear}
               outline={outline}
-              activeIdx={activeIdx}
+              activeIdx={svgActiveIdx}
               phase={phase}
               now={now}
               planArrivedAt={planArrivedAt}
@@ -1219,7 +1233,7 @@ export function ScreenProcessing({
                 >
                   <div
                     className="serif"
-                    style={{ fontSize: 19, fontStyle: "italic", color: "var(--ink)", letterSpacing: "0.005em" }}
+                    style={{ fontSize: 21, fontStyle: "italic", color: "var(--ink)", letterSpacing: "0.005em" }}
                   >
                     {n.agent.name}
                   </div>
@@ -1238,9 +1252,9 @@ export function ScreenProcessing({
                   <div
                     className="serif"
                     style={{
-                      fontSize: 14,
+                      fontSize: 16,
                       fontStyle: "italic",
-                      color: "var(--ink-2)",
+                      color: "var(--ink-1)",
                       marginTop: 6,
                       lineHeight: 1.4,
                     }}
@@ -1283,7 +1297,7 @@ export function ScreenProcessing({
                     </span>
                     <span
                       className="serif"
-                      style={{ fontStyle: "italic", color: "var(--ink-1)", fontSize: 16, lineHeight: 1.35 }}
+                      style={{ fontStyle: "italic", color: "var(--ink-1)", fontSize: 17, lineHeight: 1.45 }}
                     >
                       {o.hint}
                     </span>
