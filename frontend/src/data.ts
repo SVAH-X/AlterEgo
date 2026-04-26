@@ -88,14 +88,14 @@ export const AE_DATA: SimulationData = {
   ],
 
   futureSelfOpening:
-    "It's me. I know that's strange. I'm older than you remember being. I want to tell you that you're going to be fine — that's the thing people say — but I think you'd rather I told you what's actually here.",
+    "The years aren't the unit. The unit is what you stopped noticing.",
 
   futureSelfReplies: {
     "What did I get wrong?":
-      "You thought hours were the same as care. They aren't. The work loved you back for a while, and then it stopped, and you didn't notice for a long time. That's the part I'd take back if I could.",
+      "You thought hours were the same as care. They aren't. By the time I noticed, the work had stopped loving me back.",
     "Am I happy?":
-      "Some days. Not the way the magazines mean it. I'm not hollow. I'm not full either. There's a kitchen table I sit at on Sunday mornings that I would not trade. There's a list in a drawer that I would.",
+      "Some days. Not the way the magazines mean it. There's a Sunday kitchen table I wouldn't trade.",
     "What should I change?":
-      "Sleep. I know. Everyone says sleep. But also — call your sister this week, not next month. And the side project you keep almost-starting. Start it badly. Start it on a Saturday. Don't wait for the version of yourself who has time.",
+      "Call your sister this week, not next month. And start the side project badly, on a Saturday.",
   },
 };
