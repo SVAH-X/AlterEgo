@@ -15,6 +15,7 @@ Conversation flow:
 
 from __future__ import annotations
 
+import asyncio
 import difflib
 import json
 import os
@@ -121,8 +122,12 @@ WELCOME = (
 )
 
 INTERVIEW_NUDGE = (
-    "I'm here. Ask me anything. If you're not sure where to start, try: "
-    "\"What did I get wrong?\", \"Am I happy?\", or \"What should I change?\"\n\n"
+    "**▸ your turn — ask me anything**\n\n"
+    "I'm here. If you're not sure where to start, try one of these:\n\n"
+    "•  *What did I get wrong?*\n"
+    "•  *Am I happy?*\n"
+    "•  *What should I change?*\n"
+    "•  *Tell me about a year that hurt.*\n\n"
     "_(Type \"restart\" anytime to leave this future and simulate a different one.)_"
 )
 
@@ -260,10 +265,16 @@ def parse_intake_value(field: str, raw: str) -> Any:
 # Backend integration
 
 async def stream_simulate(profile: dict[str, Any]):
-    """Yield phase dicts from the backend's NDJSON /simulate stream."""
+    """Yield phase dicts from the backend's NDJSON /simulate stream.
+
+    Backend expects multipart/form-data: a `profile` form field (JSON-encoded
+    string) plus an optional `selfie` file. The agent has no selfie pipeline,
+    so we omit it — backend treats selfie as optional and falls back to
+    blurred placeholder portraits on the web side."""
+    data = {"profile": json.dumps(profile)}
     async with httpx.AsyncClient(timeout=300) as client:
         async with client.stream(
-            "POST", f"{BACKEND_URL}/simulate", json=profile
+            "POST", f"{BACKEND_URL}/simulate", data=data
         ) as r:
             if r.status_code >= 400:
                 # Read the body so the agent can surface the validation error
@@ -497,11 +508,17 @@ async def _handle_intake(
 async def _start_simulation(
     ctx: Context, sender: str, state: dict[str, Any]
 ) -> None:
+    """Run the backend simulation to completion, then deliver everything as a
+    bundle: counting + plan flavor live for progress feedback, then ONE big
+    message with all events, then the dramatic transition, opening, and nudge.
+    Total deliveries per simulation: ~5, well below Flockx's burst limit."""
     profile = state["profile"]
     ctx.logger.info(f"submitting profile to backend: {profile}")
     present_year = int(profile.get("presentYear", 2026))
     target_year = int(profile.get("targetYear", present_year + 20))
     last_event_year: int | None = None
+    buffered_events: list[str] = []
+    final_sim: dict[str, Any] | None = None
 
     try:
         async for ev in stream_simulate(profile):
@@ -515,7 +532,7 @@ async def _start_simulation(
                     sender,
                     f"Walking the years from **{present_year}** to **{target_year}**. "
                     f"{len(outline)} turning points, scattered across {target_year - present_year} years.\n\n"
-                    f"_Here we go._",
+                    f"_Almost ready. The whole trajectory will land in one piece._",
                 )
             elif phase == "event":
                 cp = ev.get("checkpoint", {})
@@ -523,41 +540,16 @@ async def _start_simulation(
                 msg_text = _format_event_message(
                     cp, year=year, last_event_year=last_event_year, present_year=present_year
                 )
-                await say(ctx, sender, msg_text)
+                buffered_events.append(msg_text)
                 last_event_year = year
             elif phase == "finalizing":
-                await say(
-                    ctx,
-                    sender,
-                    "_Stitching the voice you'll talk to. Pulling the years "
-                    "forward through the throat. Almost there..._",
-                )
+                # Suppressed — folded into the post-bundle transition message.
+                pass
             elif phase == "complete":
                 sim = ev.get("simulation")
                 if not isinstance(sim, dict):
                     raise RuntimeError("complete phase missing simulation")
-                state["simulation"] = sim
-                state["stage"] = "interview"
-                state["history"] = []
-                save_state(ctx, sender, state)
-
-                # Dramatic transition — the agent literally becomes the
-                # future self before the opening line lands.
-                target_age = int(profile.get("age", 32)) + (target_year - present_year)
-                await say(
-                    ctx,
-                    sender,
-                    f"_It's done._\n\n"
-                    f"_I close my eyes here in {present_year}, "
-                    f"and open them in **{target_year}**._\n\n"
-                    f"_I'm you now. {target_age} years old. Listen —_",
-                )
-
-                opening = sim.get("futureSelfOpening") or ""
-                if opening:
-                    await say(ctx, sender, opening)
-                await say(ctx, sender, INTERVIEW_NUDGE)
-                return
+                final_sim = sim
             elif phase == "error":
                 raise RuntimeError(ev.get("message", "unknown simulator error"))
     except (httpx.HTTPError, RuntimeError) as e:
@@ -569,6 +561,59 @@ async def _start_simulation(
             sender,
             f"The simulation faltered: {e}. Type 'restart' and we can try again.",
         )
+        return
+
+    if not buffered_events or not final_sim:
+        state["stage"] = "intake"
+        state["intake_step"] = 0
+        save_state(ctx, sender, state)
+        await say(
+            ctx,
+            sender,
+            "Simulation completed but produced nothing usable. Type 'restart' to try again.",
+        )
+        return
+
+    target_age = int(profile.get("age", 32)) + (target_year - present_year)
+    name = profile.get("name") or "you"
+
+    # 1. The bundle — all events in one scrollable markdown message.
+    bundle = (
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"**THE YEARS YOU LIVED · {present_year} → {target_year}**\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        + "\n\n".join(buffered_events)
+        + "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )
+    await say(ctx, sender, bundle)
+
+    # 2. The transition — clear "simulation done, conversation begins" beat.
+    await say(
+        ctx,
+        sender,
+        f"**✓ simulation complete**\n\n"
+        f"_I close my eyes here in {present_year}, "
+        f"and open them in **{target_year}**._\n\n"
+        f"_I'm you now. {target_age} years old. Listen —_",
+    )
+
+    # 3. Opening line in the future-self's voice.
+    opening = final_sim.get("futureSelfOpening") or ""
+    if opening:
+        await say(
+            ctx,
+            sender,
+            f"**🗣 {name} · {target_year}**\n\n{opening}",
+        )
+
+    # 4. Nudge with sample prompts.
+    await say(ctx, sender, INTERVIEW_NUDGE)
+
+    # Move to interview.
+    state["simulation"] = final_sim
+    state["stage"] = "interview"
+    state["history"] = []
+    save_state(ctx, sender, state)
 
 
 def _format_counting_message(ev: dict[str, Any]) -> str:
@@ -620,16 +665,18 @@ def _format_event_message(
     else:
         prefix = _time_interlude(year - last_event_year, is_first=False)
 
-    title = cp.get("title", "")
-    event_text = cp.get("event", "")
-    did = cp.get("did", "")
-    consequence = cp.get("consequence", "")
+    title = cp.get("title", "").strip()
+    event_text = cp.get("event", "").strip()
+    did = cp.get("did", "").strip()
+    consequence = cp.get("consequence", "").strip()
+    # Compact single-paragraph render — three short beats inline. Bundles
+    # cleanly when many cards share one chat message.
+    body_parts = [p for p in (event_text, did, consequence) if p]
+    body = " ".join(body_parts)
     return (
         f"{prefix}"
-        f"**{year}** — _{title}_\n\n"
-        f"{event_text}\n\n"
-        f"_{did}_\n\n"
-        f"→ {consequence}"
+        f"**{year}** · _{title}_\n\n"
+        f"{body}"
     )
 
 

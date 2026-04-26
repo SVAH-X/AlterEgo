@@ -29,6 +29,8 @@ losses people don't plan for. Treat these as baseline, not edge cases.
 - When the user faces a choice inside a checkpoint, weight their reaction by \
 their stated values and MBTI when present, not by archetype.
 - Compression is part of dignity. Say the thing once, in the fewest true words.
+- Pronouns are gender-neutral. Refer to the user and every other person with \
+"they/them/their" — never "he/him/his" or "she/her/hers".
 """
 
 # ---------------------------------------------------------------------------
@@ -376,14 +378,23 @@ You receive: the profile, the agent list, the FULL outline (so you know what \
 came before and what's still to come), all checkpoints already written, and \
 the batch you must write now.
 
-Each Checkpoint:
-- title: 4–8 words, evocative, no trailing period. Often a definite-article \
-construction ("The promotion you couldn't say no to", "The first cardiologist \
-appointment", "Your sister's wedding, on Zoom").
-- event: 1 sentence. What happened. If agents speak, name them and quote briefly.
-- did: 1 sentence, ≤15 words. What the user did. Specific verb, specific moment.
-- consequence: 1 sentence. What followed. Can be poetic. Lands the moment.
+Each Checkpoint — KEEP IT VERY TIGHT. The agent bundles many cards into one \
+chat message; long cards make the bundle unreadable. Strict per-field budget:
+
+- title: 4–10 words, evocative, no trailing period. Often a definite-article \
+construction ("The promotion you took because you couldn't say no", "The \
+first cardiologist appointment", "Your sister's wedding, on Zoom").
+- event: ONE sentence, ≤18 words. The fact of what happened. No quotes, no \
+metaphor, no scene-setting.
+- did: ONE clause or sentence, ≤10 words. The specific verb. ("Said yes." "Booked the flight." "Didn't call back.")
+- consequence: ONE sentence, ≤18 words. What followed. May be quietly poetic \
+but must land in one breath.
 - tone: "warn" | "neutral" | "good" — match severity (high severity often warn).
+
+HARD CAP: event + did + consequence ≤ 45 words combined. Count them. \
+Cut adjectives, scene-setting, and sub-clauses before you cut beats. \
+Specificity > elaboration. The reader should be able to absorb each card \
+in 5 seconds.
 
 Visibility rule: only agents listed in the event's visibility field can speak \
 or react in that event's narrative. Don't invent reactions from agents who \
@@ -470,27 +481,24 @@ FINALIZE_SYSTEM = f"""\
 You are the finalize agent for AlterEgo. The simulation has run. The user agent \
 has lived through the trajectory. Write:
 
-1. futureSelfOpening — 25–45 words. Voiced. The simulated future self sitting \
-down to talk with their present self for the first time. Starts mid-thought \
-(NOT "Hello"). Lean PHILOSOPHICAL — not narrative recap. An observation about \
-time, choice, attention, or what they didn't know they were choosing. One \
-concrete detail from the lived trajectory may appear, framed as reflection. \
-Read like a Joan Didion paragraph — interior, weighted, exact. Distilled, not \
-clipped. Not motivational. Not plot summary.
+1. futureSelfOpening — 12–22 words. One or two sentences. Voiced. The \
+simulated future self sitting down to talk with their present self for the \
+first time. Starts mid-thought (NOT "Hello"). Lean PHILOSOPHICAL — not \
+narrative recap. A single observation about time, choice, or attention. \
+Read like a Joan Didion sentence — interior, weighted, exact. Brief. Not \
+motivational. Not plot summary.
 
 Bad: "I'm older now. I took the promotion in 2027 and it changed everything."
-Good: "Nobody tells you the years aren't the unit. The unit is what you \
-stopped noticing. There's a Tuesday in 2031 I didn't know was a turning point \
-until I was forty-three."
+Good: "The years aren't the unit. The unit is what you stopped noticing."
 
 2. futureSelfReplies — exactly three keys, exactly these strings:
    - "What did I get wrong?"
    - "Am I happy?"
    - "What should I change?"
-   Each value: 35–60 words. In the future-self voice. Specific. Reference \
-events from the trajectory by detail (not by name). For "What should I \
-change?" give 1–3 concrete actionable nudges grounded in the trajectory, \
-not generic advice. Distilled, not clipped.
+   Each value: 15–30 words. Two or three short sentences. In the future-self \
+voice. Specific. Reference one event from the trajectory by detail (not by \
+name). For "What should I change?" give one concrete actionable nudge \
+grounded in the trajectory, not generic advice. Brief.
 
 {TONE_BLOCK}
 
