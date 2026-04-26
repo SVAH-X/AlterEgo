@@ -589,8 +589,8 @@ async def _fan_out_portraits_branched(
 ) -> AsyncIterator[dict]:
     """Branched-mode portrait fan-out.
 
-    - High portraits with year < intervention['year'] are preserved verbatim
-      from `original_portraits` and re-emitted with their original index.
+    - High portraits with year < intervention['year'] are skipped entirely;
+      the frontend retains them locally and re-attaches on phase: complete.
     - High portraits with year >= intervention['year'] are regenerated."""
     iv_year = int(intervention["year"])
     span = profile.targetYear - profile.presentYear
@@ -598,8 +598,11 @@ async def _fan_out_portraits_branched(
     def _events_up_to(cps: list[Checkpoint], year: int) -> list[Checkpoint]:
         return [c for c in cps if c.year <= year]
 
-    # Lookup table for preserved high portraits (year -> portrait).
-    by_year_high = {p.year: p for p in original_portraits if p.trajectory == "high"}
+    # Set of years that the original simulation had a high portrait for —
+    # used only as a membership test in the preserved-skip loop below.
+    preserved_high_years: set[int] = {
+        p.year for p in original_portraits if p.trajectory == "high"
+    }
     sem = _portrait_sem()
 
     # Pre-intervention high portraits stay in the frontend's existing state
@@ -608,7 +611,7 @@ async def _fan_out_portraits_branched(
     preserved_indices: set[int] = set()
     for i, _age in enumerate(ages):
         year = profile.presentYear + round(span * (i / 4))
-        if year < iv_year and year in by_year_high:
+        if year < iv_year and year in preserved_high_years:
             preserved_indices.add(i)
 
     async def _one(index: int, age: int) -> dict:
