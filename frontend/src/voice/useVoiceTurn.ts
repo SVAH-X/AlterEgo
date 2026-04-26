@@ -25,16 +25,19 @@ interface VoiceTurn {
   level: number;
   liveTranscript: string;
   permissionDenied: boolean;
-  /** Run one TTS-ask → listen → STT cycle. */
+  /** Run one TTS-ask → listen → STT cycle. The state stays at "showing"
+   *  with `liveTranscript` populated until reset() is called — the caller
+   *  is responsible for confirming or redoing. */
   runTurn: (
     promptText: string,
     options?: { reprompt?: string },
   ) => Promise<TurnResult>;
+  /** Clear the showing/fallback state back to idle. */
+  reset: () => void;
   abort: () => void;
 }
 
 const DEFAULT_REPROMPT = "Sorry, I didn't catch that. Could you say it again?";
-const SHOWING_HOLD_MS = 800;
 
 export function useVoiceTurn(): VoiceTurn {
   const tts = useTTSPlayer();
@@ -48,7 +51,13 @@ export function useVoiceTurn(): VoiceTurn {
     tts.stop();
     void listener.stop();
     setState("idle");
+    setLiveTranscript("");
   }, [tts, listener]);
+
+  const reset = useCallback(() => {
+    setState("idle");
+    setLiveTranscript("");
+  }, []);
 
   const runTurn = useCallback(
     async (
@@ -100,8 +109,7 @@ export function useVoiceTurn(): VoiceTurn {
 
       setLiveTranscript(attempt.transcript);
       setState("showing");
-      await new Promise((r) => setTimeout(r, SHOWING_HOLD_MS));
-      setState("idle");
+      // Stay at "showing" — the caller drives confirm/redo via reset().
       return { transcript: attempt.transcript, blob: attempt.blob, durationMs: attempt.durationMs, fellBack: false };
     },
     [tts, listener],
@@ -113,6 +121,7 @@ export function useVoiceTurn(): VoiceTurn {
     liveTranscript,
     permissionDenied: listener.permissionDenied,
     runTurn,
+    reset,
     abort,
   };
 }

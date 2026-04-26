@@ -591,14 +591,20 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
   // Per-step fallback latch: if a voice turn fell back to typing for THIS
   // question, freeze it as a typed input until the user advances.
   const [forceTypedField, setForceTypedField] = useState(false);
+  // Bumped to re-trigger the voice-mode effect for the same step (redo).
+  const [redoNonce, setRedoNonce] = useState(0);
+  // Holds the transcript awaiting confirmation. While set, Space/Enter advances
+  // and R re-runs the turn.
+  const [pendingTranscript, setPendingTranscript] = useState<string | null>(null);
 
   const isVoice = inputMode === "voice" && !forceTypedField;
   const isSpeechField =
     cur.type === "text" || cur.type === "number" || cur.type === "textarea";
 
-  // Reset the per-field fallback latch when the step changes.
+  // Reset the per-field fallback latch and any pending transcript when the step changes.
   useEffect(() => {
     setForceTypedField(false);
+    setPendingTranscript(null);
   }, [step]);
 
   useEffect(() => {
@@ -608,8 +614,9 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, voiceMode, voicePrimed, inputMode]);
 
-  // Voice-mode driver: one turn per step. Do NOT add forceTypedField to deps —
-  // it would re-fire turn.abort() and start a fresh turn after fallback.
+  // Voice-mode driver: one turn per step (or per redo). Do NOT add
+  // forceTypedField to deps — it would re-fire turn.abort() and start a
+  // fresh turn after fallback.
   useEffect(() => {
     if (inputMode !== "voice") return;
     let cancelled = false;
@@ -632,8 +639,7 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
         return;
       }
       if (result.transcript) {
-        applyValue(result.transcript, "voice");
-        advance();
+        setPendingTranscript(result.transcript);
       }
     })();
 
@@ -642,7 +648,41 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
       turn.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, inputMode]);
+  }, [step, inputMode, redoNonce]);
+
+  // While a transcript is pending confirmation, listen for Space/Enter (confirm)
+  // and R (redo). Hands-free chat: no need to touch the keyboard mouse.
+  useEffect(() => {
+    if (pendingTranscript === null) return;
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      if (target?.matches?.("input, textarea")) return;
+      if (e.key === " " || e.code === "Space" || e.key === "Enter") {
+        e.preventDefault();
+        confirmPending();
+      } else if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        redoPending();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingTranscript]);
+
+  function confirmPending() {
+    if (pendingTranscript === null) return;
+    applyValue(pendingTranscript, "voice");
+    setPendingTranscript(null);
+    turn.reset();
+    advance();
+  }
+
+  function redoPending() {
+    setPendingTranscript(null);
+    turn.reset();
+    setRedoNonce((n) => n + 1);
+  }
 
   function advance() {
     tts.stop();
@@ -768,7 +808,14 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
           </label>
 
           {isVoice && isSpeechField ? (
-            <VoiceFieldDisplay state={turn.state} level={turn.level} transcript={turn.liveTranscript} />
+            <VoiceFieldDisplay
+              state={turn.state}
+              level={turn.level}
+              transcript={turn.liveTranscript}
+              awaitingConfirm={pendingTranscript !== null}
+              onConfirm={confirmPending}
+              onRedo={redoPending}
+            />
           ) : cur.type === "textarea" ? (
             <textarea
               ref={textareaRef}
@@ -912,10 +959,16 @@ function VoiceFieldDisplay({
   state,
   level,
   transcript,
+  awaitingConfirm,
+  onConfirm,
+  onRedo,
 }: {
   state: import("../voice/useVoiceTurn").TurnState;
   level: number;
   transcript: string;
+  awaitingConfirm: boolean;
+  onConfirm: () => void;
+  onRedo: () => void;
 }) {
   const ringScale = 1 + Math.min(level, 1) * 0.5;
 
@@ -934,10 +987,10 @@ function VoiceFieldDisplay({
           width: 96,
           height: 96,
           borderRadius: "50%",
-          background: VOICE_RING_BG[state],
+          background: awaitingConfirm ? "var(--accent)" : VOICE_RING_BG[state],
           transform: `scale(${ringScale.toFixed(3)})`,
           transition: "transform 80ms linear, background 200ms var(--ease)",
-          opacity: state === "idle" ? 0.3 : 1,
+          opacity: state === "idle" && !awaitingConfirm ? 0.3 : 1,
         }}
       />
       <div
@@ -951,20 +1004,63 @@ function VoiceFieldDisplay({
           minHeight: 14,
         }}
       >
-        {VOICE_STATUS_TEXT[state]}
+        {awaitingConfirm ? "i heard" : VOICE_STATUS_TEXT[state]}
       </div>
       <div
         className="serif"
         style={{
-          fontSize: 22,
+          fontSize: awaitingConfirm ? 32 : 22,
           fontStyle: "italic",
           color: "var(--ink-1)",
           minHeight: 30,
           textAlign: "center",
+          fontWeight: awaitingConfirm ? 500 : 400,
+          transition: "font-size 200ms var(--ease)",
         }}
       >
-        {transcript}
+        {awaitingConfirm ? `“${transcript}”` : transcript}
       </div>
+      {awaitingConfirm && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 14,
+            marginTop: 8,
+          }}
+        >
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="btn btn-accent"
+            style={{
+              padding: "16px 32px",
+              fontSize: 16,
+              minWidth: 280,
+              boxShadow: "0 0 0 4px var(--bg-2), 0 0 0 5px var(--accent)",
+            }}
+          >
+            press SPACE or ENTER to confirm
+          </button>
+          <button
+            type="button"
+            onClick={onRedo}
+            className="btn"
+            style={{
+              padding: "10px 20px",
+              fontSize: 13,
+              background: "transparent",
+              border: "1px solid var(--line-soft)",
+              color: "var(--ink-2)",
+              fontFamily: "var(--mono)",
+              letterSpacing: "0.08em",
+            }}
+          >
+            press R to redo
+          </button>
+        </div>
+      )}
     </div>
   );
 }
