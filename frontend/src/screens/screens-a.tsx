@@ -3,13 +3,19 @@ import type { FilledOutline, ScreenProps, SimStreamPhase } from "../App";
 import { clamp, Mark, Meta, PortraitImage, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
 import { nearestPortrait } from "../lib/portraits";
-import type { AgentSpec, Checkpoint, Profile } from "../types";
+import type { AgentSpec, Profile } from "../types";
 import romanStatue from "../assets/roman-half-blur.png";
 import darkClouds from "../assets/dark-grey-clouds-over-the-ocean.jpg";
 import { useVoice, useVoicePrimed } from "../voice/VoiceContext";
 import { useTTSPlayer } from "../voice/useTTSPlayer";
 import { MicButton } from "../voice/MicButton";
 import { cloneVoice } from "../lib/voice";
+import {
+  AdvanceDock,
+  StoryScroll,
+  useStoryQueue,
+  type DockState,
+} from "./processing-story";
 
 export function ScreenLanding({ onContinue, onJumpTo }: ScreenProps) {
   return (
@@ -654,34 +660,6 @@ function layoutAgents(agents: AgentSpec[]): NodeLayout[] {
   return out;
 }
 
-interface Bubble {
-  who: string;
-  line: string;
-}
-
-function makeBubbles(cp: Checkpoint, agents: AgentSpec[], actors: string[]): Bubble[] {
-  const cast = new Map(agents.map((a) => [a.agent_id, a]));
-  const actorNames = actors
-    .map((id) => cast.get(id)?.name)
-    .filter((n): n is string => Boolean(n) && n !== "You");
-
-  const bubbles: Bubble[] = [];
-  const quoteRe = /"([^"]+)"/;
-  const m = quoteRe.exec(cp.event);
-  if (m) {
-    const speaker =
-      actorNames.find((n) => cp.event.includes(n)) ?? actorNames[0] ?? "—";
-    bubbles.push({ who: speaker, line: m[1] });
-    const lead = cp.event.replace(/"[^"]+"/g, "").replace(/\s+/g, " ").trim();
-    if (lead && lead.length > 6) bubbles.push({ who: "narrator", line: lead });
-  } else {
-    bubbles.push({ who: "narrator", line: cp.event });
-  }
-  if (cp.did) bubbles.push({ who: "narrator", line: cp.did });
-  if (cp.consequence) bubbles.push({ who: "narrator", line: cp.consequence });
-  return bubbles.slice(0, 4);
-}
-
 // Error gets its own sentinel (0) so the body switches to a dedicated error
 // panel rather than rendering the cosmetic "composing the monologue" UI.
 const PHASE_TO_STEP: Record<SimStreamPhase, number> = {
@@ -711,6 +689,7 @@ export function ScreenProcessing({
   runSimulate,
 }: ScreenProps) {
   const [now, setNow] = useState(() => performance.now());
+  const [_userUnlockedPhase, setUserUnlockedPhase] = useState<number>(0);
   const mountedAtRef = useRef(Date.now());
   const { intakeSamples, intakeSamplesSeconds, setClonedVoiceId } = useVoice();
 
@@ -793,19 +772,14 @@ export function ScreenProcessing({
     return best;
   }, [outline]);
   const active = activeIdx >= 0 ? outline[activeIdx] : null;
-  const activeAge = active?.checkpoint?.age ?? null;
 
-  // Bubbles for the active event — extraction (regex + map build) is memoized
-  // on the checkpoint identity. Staggered visibility is sliced from `now`
-  // on each render, which is cheap.
-  const allBubbles = useMemo(
-    () =>
-      active?.checkpoint
-        ? makeBubbles(active.checkpoint, agents, active.primary_actors)
-        : [],
-    [active?.checkpoint, agents, active?.primary_actors],
-  );
-
+  // The story queue paces text reveal independently of the SVG's pulses.
+  const queue = useStoryQueue({
+    outline,
+    agents,
+    now,
+    active: simStreamPhase !== "idle" && simStreamPhase !== "error",
+  });
   // ---- per-frame derivations (cheap; no useMemo because `now` invalidates every tick) ----
 
   function arrivalAlpha(agentId: string): number {
@@ -835,10 +809,6 @@ export function ScreenProcessing({
     })
     .filter(<T,>(n: T | null): n is T => n !== null);
   const lastArrived = decoratedNodes[decoratedNodes.length - 1];
-
-  const visibleBubbles = active?.filledAt !== undefined
-    ? allBubbles.filter((_, i) => now - active.filledAt! >= i * 600)
-    : [];
 
   let finalProgress = 0;
   if (simStreamPhase === "finalizing" || simStreamPhase === "complete") {
@@ -893,6 +863,73 @@ export function ScreenProcessing({
 
   const cx = GRAPH_W / 2;
   const cy = GRAPH_H / 2;
+
+  function dockStateForScreen({
+    phase,
+    isError,
+    queue,
+    now: _now,
+  }: {
+    phase: number;
+    isError: boolean;
+    queue: ReturnType<typeof useStoryQueue>;
+    now: number;
+  }): DockState {
+    if (isError) return "final";
+    if (phase === 1) {
+      const arrivedCount = decoratedNodes.length;
+      const total = layout.length || 0;
+      if (total > 0 && arrivedCount >= total) return "ready";
+      return "streaming";
+    }
+    if (phase === 2) {
+      if (planArrivedAt === null) return "streaming";
+      const lastRevealAt = planArrivedAt + 600 + (outline.length - 1) * 700;
+      return _now >= lastRevealAt ? "ready" : "revealing";
+    }
+    if (phase === 3) return queue.dockState;
+    if (phase === 4) {
+      if (simStreamPhase === "complete" && finalProgress >= 1) return "final";
+      return "streaming";
+    }
+    return "streaming";
+  }
+
+  function handleAdvance() {
+    if (isError) {
+      onContinue();
+      return;
+    }
+    if (phase === 1 || phase === 2) {
+      setUserUnlockedPhase(phase);
+      return;
+    }
+    if (phase === 3) {
+      if (queue.drained && (simStreamPhase === "complete" || simStreamPhase === "finalizing")) {
+        onContinue();
+        return;
+      }
+      queue.advance();
+      return;
+    }
+    if (simStreamPhase === "complete") {
+      onContinue();
+    }
+  }
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      if (target?.matches?.("input, textarea")) return;
+      if (e.key === "ArrowRight" || e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
+        handleAdvance();
+      }
+    }
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  });
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
@@ -1256,59 +1293,9 @@ export function ScreenProcessing({
             </div>
           )}
 
-          {!isError && phase === 3 && active && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 0, overflow: "hidden" }}>
-              <div style={{ paddingBottom: 14, borderBottom: "1px solid var(--line-soft)" }}>
-                <div
-                  className="mono"
-                  style={{
-                    fontSize: 10,
-                    letterSpacing: "0.22em",
-                    color: "var(--accent)",
-                    textTransform: "uppercase",
-                    marginBottom: 6,
-                  }}
-                >
-                  {active.year}
-                  {activeAge !== null ? ` · age ${activeAge}` : ""}
-                </div>
-                <div className="serif" style={{ fontSize: 19, fontStyle: "italic", lineHeight: 1.35, color: "var(--ink)" }}>
-                  {active.title || active.hint}
-                </div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 14, overflow: "hidden" }}>
-                {visibleBubbles.map((b, j) => (
-                  <div
-                    key={`${activeIdx}-${j}`}
-                    style={{ animation: "fade-in 600ms var(--ease) both" }}
-                  >
-                    <div
-                      className="mono"
-                      style={{
-                        fontSize: 9,
-                        letterSpacing: "0.22em",
-                        color: b.who === "narrator" ? "var(--ink-3)" : "var(--accent)",
-                        textTransform: "uppercase",
-                        marginBottom: 4,
-                      }}
-                    >
-                      {b.who === "narrator" ? "—" : b.who}
-                    </div>
-                    <div
-                      className="serif"
-                      style={{
-                        fontSize: 16,
-                        lineHeight: 1.45,
-                        color: b.who === "narrator" ? "var(--ink-2)" : "var(--ink)",
-                        fontStyle: b.who === "narrator" ? "italic" : "normal",
-                        letterSpacing: "0.003em",
-                      }}
-                    >
-                      {b.who === "narrator" ? b.line : `"${b.line}"`}
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {!isError && phase === 3 && (
+            <div style={{ display: "flex", flexDirection: "column", minHeight: 0, flex: 1 }}>
+              <StoryScroll visible={queue.visible} now={now} />
             </div>
           )}
 
@@ -1360,6 +1347,12 @@ export function ScreenProcessing({
               </div>
             </div>
           )}
+
+          <AdvanceDock
+            state={dockStateForScreen({ phase, isError, queue, now })}
+            now={now}
+            onAdvance={handleAdvance}
+          />
         </div>
       </div>
 
