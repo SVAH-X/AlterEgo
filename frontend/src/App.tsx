@@ -254,7 +254,7 @@ export default function App() {
             setSimStreamPhase("events");
           } else if (ev.phase === "finalizing") {
             setSimStreamPhase("finalizing");
-            setLatestTitle("weaving the threads — the voice");
+            setLatestTitle("polishing the details");
           } else if (ev.phase === "complete") {
             setSimulationState(ev.simulation);
             setTimelineViewed(false);
@@ -320,7 +320,7 @@ export default function App() {
     errorMessage,
   };
 
-  const noop = () => {};
+  const noop = () => { };
   const leavingProps: ScreenProps = {
     ...screenProps,
     onContinue: noop,
