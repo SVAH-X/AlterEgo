@@ -378,12 +378,12 @@ came before and what's still to come), all checkpoints already written, and \
 the batch you must write now.
 
 Each Checkpoint:
-- title: 4–10 words, evocative, no trailing period. Often a definite-article \
-construction ("The promotion you took because you couldn't say no", "The \
-first cardiologist appointment", "Your sister's wedding, on Zoom").
-- event: 1–2 sentences. What happened. If agents speak, name them and quote them.
-- did: 1 sentence. What the user did. Specific verb, specific moment.
-- consequence: 1–2 sentences. What followed. Can be poetic. Lands the moment.
+- title: 4–8 words, evocative, no trailing period. Often a definite-article \
+construction ("The promotion you couldn't say no to", "The first cardiologist \
+appointment", "Your sister's wedding, on Zoom").
+- event: 1 sentence. What happened. If agents speak, name them and quote briefly.
+- did: 1 sentence, ≤15 words. What the user did. Specific verb, specific moment.
+- consequence: 1 sentence. What followed. Can be poetic. Lands the moment.
 - tone: "warn" | "neutral" | "good" — match severity (high severity often warn).
 
 Visibility rule: only agents listed in the event's visibility field can speak \
