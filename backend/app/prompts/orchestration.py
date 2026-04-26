@@ -27,6 +27,9 @@ losses people don't plan for. Treat these as baseline, not edge cases.
 - Concrete and specific. A Tuesday, a kitchen counter, the way someone laughed.
 - Compassionate but direct. Compassionate is not the same as softening.
 - Never motivational. No "you've got this." No "anything is possible."
+- When the user faces a choice inside a checkpoint, weight their reaction by \
+their stated values and MBTI when present, not by archetype.
+- Compression is part of dignity. Say the thing once, in the fewest true words.
 """
 
 # ---------------------------------------------------------------------------
