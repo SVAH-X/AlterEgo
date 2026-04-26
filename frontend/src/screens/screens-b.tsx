@@ -1,13 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ScreenProps } from "../App";
-import {
-  CornerLabel,
-  Mark,
-  Meta,
-  PortraitImage,
-  Wave,
-  useStreamedText,
-} from "../atoms";
+import { Mark, Meta, PortraitImage, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
 import { chat, simulateBranchStream } from "../lib/api";
 import { nearestPortrait } from "../lib/portraits";
@@ -139,8 +132,6 @@ export function ScreenChat({ onContinue, onJumpTo, profile, simulation }: Screen
       <div className="mark-anchor">
         <Mark onClick={() => onJumpTo("landing")} />
       </div>
-      <CornerLabel pos="tr">interview · {profile.targetYear || 2046}</CornerLabel>
-
       <div
         style={{
           borderRight: "1px solid var(--line-soft)",
@@ -527,10 +518,6 @@ export function ScreenTimeline({
       <div className="mark-anchor">
         <Mark onClick={() => onJumpTo("landing")} />
       </div>
-      <CornerLabel pos="tr">
-        {rewriting ? `rewriting · from ${rewriting.year}` : "timeline · scrubbing"}
-      </CornerLabel>
-
       {rewriting && (
         <div
           style={{
@@ -1199,8 +1186,6 @@ export function ScreenEnd({ onRestart, onJumpTo, profile, simulation }: ScreenPr
       <div className="mark-anchor">
         <Mark onClick={() => onJumpTo("landing")} />
       </div>
-      <CornerLabel pos="tr">end · {endYear}</CornerLabel>
-
       <div
         style={{
           display: "flex",
