@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FilledOutline, ScreenProps } from "../App";
-import type { SimStreamPhase } from "../App";
-import { clamp, CornerLabel, Mark, Meta, PortraitImage, Wave, useStreamedText } from "../atoms";
+import type { FilledOutline, ScreenProps, SimStreamPhase } from "../App";
+import { clamp, Mark, Meta, PortraitImage, Wave, useStreamedText } from "../atoms";
 import { AE_DATA } from "../data";
 import { nearestPortrait } from "../lib/portraits";
 import type { AgentSpec, Checkpoint, Profile } from "../types";
@@ -24,8 +23,6 @@ export function ScreenLanding({ onContinue, onJumpTo, setSelfieUploaded, setSelf
       <div className="mark-anchor">
         <Mark onClick={() => onJumpTo("landing")} />
       </div>
-      <CornerLabel pos="tr">v 0.3 · simulation build</CornerLabel>
-
       {/* Whole hero advances to the selfie choice screen. */}
       <button
         type="button"
@@ -361,11 +358,6 @@ export function ScreenIntake({ onContinue, onJumpTo, profile, setProfile, pushVo
       <div className="mark-anchor">
         <Mark onClick={() => onJumpTo("landing")} />
       </div>
-      <CornerLabel pos="tr">
-        intake · {String(step + 1).padStart(2, "0")} /{" "}
-        {String(INTAKE_FIELDS.length).padStart(2, "0")}
-      </CornerLabel>
-
       <div
         style={{
           flex: 1,
@@ -945,7 +937,6 @@ export function ScreenProcessing({
       <div className="mark-anchor">
         <Mark onClick={() => onJumpTo("landing")} />
       </div>
-
       <div
         style={{
           position: "absolute",
@@ -1631,10 +1622,6 @@ export function ScreenReveal({ onContinue, onJumpTo, profile, simulation }: Scre
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, voiceMode, voicePrimed, opening, clonedVoiceId]);
 
-  const olderAge =
-    (Number(profile.age) || 32) +
-    ((Number(profile.targetYear) - Number(profile.presentYear)) || 20);
-
   return (
     <div
       style={{
@@ -1657,10 +1644,6 @@ export function ScreenReveal({ onContinue, onJumpTo, profile, simulation }: Scre
       >
         <Mark onClick={() => onJumpTo("landing")} />
       </div>
-      <CornerLabel pos="tr">
-        {profile.targetYear} · age {olderAge}
-      </CornerLabel>
-
       {/* Scroll container — content centers when it fits, scrolls when it doesn't */}
       <div
         style={{
